@@ -194,6 +194,20 @@ import Testing
     _ = try database.verifyAuditChain()
 }
 
+@Test func todayUnlockCountIgnoresOnboardingAndYesterday() throws {
+    let database = try makeDatabase()
+    let now = Date()
+    let yesterday = try #require(Calendar.current.date(byAdding: .day, value: -1, to: now))
+    _ = try database.appendAudit(AuditEventDraft(eventType: .yubiKeyUnlocked, timestamp: now))
+    _ = try database.appendAudit(AuditEventDraft(
+        eventType: .yubiKeyUnlocked,
+        metadata: ["context": "onboarding"],
+        timestamp: now
+    ))
+    _ = try database.appendAudit(AuditEventDraft(eventType: .yubiKeyUnlocked, timestamp: yesterday))
+    #expect(try database.todayUnlockCount(now: now) == 1)
+}
+
 private func entryPlan() throws -> TradePlan {
     try TradePlan(
         application: .ibkr,
