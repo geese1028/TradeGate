@@ -1,6 +1,16 @@
 import Testing
 @testable import TradeGateCore
 
+@Test func missingYkmanStaysFailClosed() async throws {
+    let selection = YubiKeyBackend.select(environment: ["TRADEGATE_YKMAN": "/tmp/tradegate-missing-ykman"])
+    #expect(selection.warning != nil)
+    let devices = try await selection.controller.listDevices()
+    #expect(devices.isEmpty)
+    await #expect(throws: YubiKeyControlError.self) {
+        try await selection.controller.unlock(deviceID: "1")
+    }
+}
+
 @Test func mockCoversRequiredScenarios() async throws {
     let mock = MockYubiKeyController()
     await mock.apply(.absent)

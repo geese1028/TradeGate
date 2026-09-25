@@ -55,6 +55,44 @@ public enum YubiKeyControlError: Error, Equatable, Sendable {
     case unsupportedYkmanVersion(String)
 }
 
+public actor FailClosedYubiKeyController: YubiKeyControlling {
+    public let reason: String
+
+    public init(reason: String) {
+        self.reason = reason
+    }
+
+    public func listDevices() async throws -> [YubiKeyDevice] { [] }
+
+    public func getState(deviceID _: String) async throws -> YubiKeyState {
+        YubiKeyState(present: false, fido2Enabled: false, u2fEnabled: false)
+    }
+
+    public func lock(deviceID _: String) async throws {
+        throw YubiKeyControlError.failed(reason)
+    }
+
+    public func unlock(deviceID _: String) async throws {
+        throw YubiKeyControlError.failed(reason)
+    }
+}
+
+public enum YubiKeyBackend {
+    public static func select(environment: [String: String] = ProcessInfo.processInfo.environment) -> (controller: any YubiKeyControlling, warning: String?) {
+        if environment["TRADEGATE_MOCK"] == "1" {
+            return (MockYubiKeyController(), nil)
+        }
+        let path = environment["TRADEGATE_YKMAN"] ?? "/opt/homebrew/bin/ykman"
+        let allowUntrusted = environment["TRADEGATE_DEV_YKMAN"] == "1"
+        do {
+            let controller = try YkmanCLIController(executable: path, allowUntrusted: allowUntrusted)
+            return (controller, nil)
+        } catch {
+            return (FailClosedYubiKeyController(reason: "\(error)"), "\(error)")
+        }
+    }
+}
+
 public protocol YubiKeyControlling: Sendable {
     func listDevices() async throws -> [YubiKeyDevice]
     func getState(deviceID: String) async throws -> YubiKeyState
