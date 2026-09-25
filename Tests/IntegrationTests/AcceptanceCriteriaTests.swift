@@ -176,6 +176,20 @@ import Testing
     #expect(try harness.database.auditEvents().map(\.eventType).contains(.planCancelled))
 }
 
+@Test func daemonSnapshotKeepsTheWindowOpenUntilDeadline() async throws {
+    let harness = try AcceptanceHarness()
+    await harness.coordinator.boot()
+    let plan = try await harness.coordinator.createPlan(entryPlan())
+    let start = Date(timeIntervalSince1970: 5_000)
+    try await harness.coordinator.approveAndUnlock(planID: plan.id, now: start)
+    _ = await harness.coordinator.snapshot(now: start.addingTimeInterval(30))
+    #expect(await harness.coordinator.currentState() == .unlocked)
+    #expect(try await harness.mock.getState(deviceID: "111").fidoAvailable)
+    _ = await harness.coordinator.snapshot(now: start.addingTimeInterval(120))
+    #expect(await harness.coordinator.currentState() != .unlocked)
+    #expect(!(try await harness.mock.getState(deviceID: "111").fidoAvailable))
+}
+
 @Test func ac16SourcesDoNotUseNetwork() throws {
     let root = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
