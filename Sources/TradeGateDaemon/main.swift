@@ -1,5 +1,16 @@
+import Darwin
 import Foundation
 import TradeGateCore
+
+for argument in CommandLine.arguments.dropFirst() {
+    if argument == "--mock" {
+        setenv("TRADEGATE_MOCK", "1", 1)
+    } else if let value = argument.split(separator: "=", maxSplits: 1).last, argument.hasPrefix("--mach-service=") {
+        setenv("TRADEGATE_MACH_SERVICE", String(value), 1)
+    } else if let value = argument.split(separator: "=", maxSplits: 1).last, argument.hasPrefix("--support-dir=") {
+        setenv("TRADEGATE_SUPPORT_DIR", String(value), 1)
+    }
+}
 
 let directory = TradeGatePaths.supportDirectory
 TradeGatePaths.adoptNewerRootDatabaseIfNeeded()

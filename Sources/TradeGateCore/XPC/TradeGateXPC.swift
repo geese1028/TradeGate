@@ -95,7 +95,13 @@ public enum TradeGatePaths {
         (try? FileManager.default.attributesOfItem(atPath: path)[.modificationDate] as? Date) ?? .distantPast
     }
 
-    public static let machService = "com.tradegate.daemon"
+    public static var machService: String {
+        let override = ProcessInfo.processInfo.environment["TRADEGATE_MACH_SERVICE"] ?? ""
+        if !override.isEmpty {
+            return override
+        }
+        return "com.tradegate.daemon"
+    }
 
     private static func consoleUserHome() -> String? {
         var info = stat()

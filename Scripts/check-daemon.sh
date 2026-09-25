@@ -10,6 +10,7 @@ cli="$(pwd)/.build/debug/tradegate"
 uid="$(id -u)"
 domain="gui/${uid}"
 label="com.tradegate.daemon.ac15"
+mach="com.tradegate.daemon.ac15"
 support="$(mktemp -d "${TMPDIR:-/tmp}/tradegate-ac15.XXXXXX")"
 agents="${HOME}/Library/LaunchAgents"
 plist="${agents}/${label}.plist"
@@ -24,6 +25,9 @@ cat >"$plist" <<EOF
     <key>ProgramArguments</key>
     <array>
         <string>${daemon}</string>
+        <string>--mock</string>
+        <string>--mach-service=${mach}</string>
+        <string>--support-dir=${support}</string>
     </array>
     <key>EnvironmentVariables</key>
     <dict>
@@ -31,10 +35,16 @@ cat >"$plist" <<EOF
         <string>1</string>
         <key>TRADEGATE_SUPPORT_DIR</key>
         <string>${support}</string>
+        <key>TRADEGATE_MACH_SERVICE</key>
+        <string>${mach}</string>
     </dict>
+    <key>StandardOutPath</key>
+    <string>${support}/daemon.out</string>
+    <key>StandardErrorPath</key>
+    <string>${support}/daemon.err</string>
     <key>MachServices</key>
     <dict>
-        <key>com.tradegate.daemon</key>
+        <key>${mach}</key>
         <true/>
     </dict>
     <key>RunAtLoad</key>
@@ -85,8 +95,25 @@ if [ "$parent" != "1" ]; then
 fi
 
 export TRADEGATE_SUPPORT_DIR="$support"
-first="$("$cli" status)"
-printf '%s\n' "$first" | grep -q "State: PLAN_REQUIRED"
+export TRADEGATE_MACH_SERVICE="$mach"
+first=""
+i=0
+while [ "$i" -lt 8 ]; do
+  first="$("$cli" status)"
+  if printf '%s\n' "$first" | grep -q "State: PLAN_REQUIRED"; then
+    break
+  fi
+  i=$((i + 1))
+  sleep 0.25
+done
+printf '%s\n' "$first"
+if ! printf '%s\n' "$first" | grep -q "State: PLAN_REQUIRED"; then
+  echo "--- daemon stdout ---" >&2
+  cat "$support/daemon.out" >&2 || true
+  echo "--- daemon stderr ---" >&2
+  cat "$support/daemon.err" >&2 || true
+  exit 1
+fi
 printf '%s\n' "$first" | grep -q "Present"
 
 # Stand-in for the menu-bar process: its own session, so quitting it cannot

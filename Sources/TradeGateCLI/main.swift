@@ -96,8 +96,11 @@ func pendingFromDatabase() -> Int {
 }
 
 func xpc(action: String, payload: String) -> String {
-    let userAgent = xpc(action: action, payload: payload, privileged: false, timeout: 0.4)
+    let userAgent = xpc(action: action, payload: payload, privileged: false, timeout: 1)
     if userAgent.contains("\"ok\":true") {
+        return userAgent
+    }
+    if ProcessInfo.processInfo.environment["TRADEGATE_MACH_SERVICE"] != nil {
         return userAgent
     }
     return xpc(action: action, payload: payload, privileged: true, timeout: 2)
