@@ -248,6 +248,10 @@ public actor GateCoordinator {
         }
         do {
             try await yubiKey.unlock(deviceID: serial)
+            let opened = try await yubiKey.getState(deviceID: serial)
+            guard opened.fidoAvailable else {
+                throw YubiKeyControlError.failed("FIDO stayed disabled")
+            }
             try transition(.unlockSucceeded)
             let settings = try database.settings()
             unlockDeadline = now.addingTimeInterval(TimeInterval(settings.unlockDurationSeconds))

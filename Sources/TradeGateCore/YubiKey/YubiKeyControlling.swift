@@ -146,6 +146,7 @@ public actor MockYubiKeyController: YubiKeyControlling {
 
     private var devices: [String: SimulatedDevice]
     private var scriptedError: YubiKeyControlError?
+    private var unlockLeavesDisabled = false
     public private(set) var lockCount = 0
     public private(set) var unlockCount = 0
 
@@ -155,6 +156,10 @@ public actor MockYubiKeyController: YubiKeyControlling {
 
     public func scriptNextFailure(_ error: YubiKeyControlError) {
         scriptedError = error
+    }
+
+    public func setUnlockLeavesDisabled(_ value: Bool) {
+        unlockLeavesDisabled = value
     }
 
     public func apply(_ scenario: MockYubiKeyScenario, serialNumber: String = "12345678") {
@@ -242,6 +247,11 @@ public actor MockYubiKeyController: YubiKeyControlling {
             device.failNextUnlock = false
             devices[deviceID] = device
             throw YubiKeyControlError.failed("mock unlock failure")
+        }
+        if unlockLeavesDisabled {
+            devices[deviceID] = device
+            unlockCount += 1
+            return
         }
         device.fido2Enabled = true
         device.u2fEnabled = true

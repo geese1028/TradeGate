@@ -215,6 +215,19 @@ import Testing
     #expect(!(try await harness.mock.getState(deviceID: "111").fidoAvailable))
 }
 
+@Test func unlockThatDoesNotEnableFIDODoesNotCountAsOpen() async throws {
+    let harness = try AcceptanceHarness()
+    await harness.coordinator.boot()
+    await harness.mock.setUnlockLeavesDisabled(true)
+    let plan = try await harness.coordinator.createPlan(entryPlan())
+    do {
+        try await harness.coordinator.approveAndUnlock(planID: plan.id)
+        #expect(Bool(false))
+    } catch is YubiKeyControlError {}
+    #expect(await harness.coordinator.currentState() != .unlocked)
+    #expect(!(try await harness.mock.getState(deviceID: "111").fidoAvailable))
+}
+
 @Test func finishingAnEmergencyReviewClearsTheGate() async throws {
     let harness = try AcceptanceHarness()
     await harness.coordinator.boot()
