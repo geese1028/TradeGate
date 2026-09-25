@@ -31,14 +31,25 @@ import Testing
         .deletingLastPathComponent()
     let text = try String(contentsOf: root.appendingPathComponent("Packaging/com.tradegate.daemon.plist"), encoding: .utf8)
     #expect(text.contains("SMAuthorizedClients"))
+    #expect(text.contains("AssociatedBundleIdentifiers"))
     #expect(text.contains("com.tradegate.app"))
     #expect(text.contains("com.tradegate.cli"))
+    #expect(text.contains("Contents/MacOS/TradeGateDaemon"))
 }
 
 @Test func snapshotNamesTheHelper() async throws {
     let harness = try AcceptanceHarness()
     let snapshot = await harness.coordinator.snapshot()
     #expect(snapshot.helperStatus == "mock")
+    #expect(snapshot.serviceGeneration == TradeGateBuild.serviceGeneration)
+}
+
+@Test func snapshotFromAnOlderDaemonStillDecodes() throws {
+    let json = """
+    {"state":"LOCKED","pendingReviewCount":0,"todayUnlocks":0,"yubiKeyPresent":false,"needsExecutionPrompt":false,"onboardingComplete":false}
+    """
+    let snapshot = try JSONDecoder().decode(GateSnapshot.self, from: Data(json.utf8))
+    #expect(snapshot.serviceGeneration == nil)
 }
 
 @Test func ac01BootDisablesFIDO() async throws {

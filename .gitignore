@@ -5,3 +5,6 @@ dist/
 DerivedData/
 *.xcodeproj/xcuserdata/
 *.xcuserstate
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

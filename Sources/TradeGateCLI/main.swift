@@ -45,7 +45,7 @@ case "status":
         print("YubiKey:")
         print("Unknown")
         print("")
-        print("Today unlocks: 0")
+        print("Today unlocks: \(todayUnlocksFromDatabase())")
     }
 case "audit":
     guard arguments.dropFirst().first == "verify" else {
@@ -64,18 +64,37 @@ case "doctor":
         guard FileManager.default.isExecutableFile(atPath: path) else {
             throw TradeGateError.invalidState("ykman not executable at \(path)")
         }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: path)
+        process.arguments = ["--version"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+        try process.run()
+        process.waitUntilExit()
+        let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        guard process.terminationStatus == 0,
+              let version = YkmanTextParser.version(from: output),
+              version.isSupportedRelease
+        else {
+            throw TradeGateError.invalidState("ykman version is not supported")
+        }
     }
+    let snapshot = xpc(action: "snapshot", payload: "")
     failures += report("XPC") {
-        let reply = xpc(action: "snapshot", payload: "")
-        guard reply.contains("\"ok\":true") else { throw TradeGateError.invalidState(reply) }
+        guard snapshot.contains("\"ok\":true") else {
+            throw TradeGateError.invalidState(snapshot.isEmpty ? "daemon did not answer" : snapshot)
+        }
     }
     failures += report("daemon") {
-        let reply = xpc(action: "snapshot", payload: "")
-        guard reply.contains("\"ok\":true") else { throw TradeGateError.invalidState("daemon did not answer") }
+        guard snapshot.contains("\"ok\":true") else {
+            throw TradeGateError.invalidState("daemon did not answer")
+        }
     }
     failures += report("YubiKey") {
-        let reply = xpc(action: "snapshot", payload: "")
-        guard reply.contains("yubiKeyPresent") else { throw TradeGateError.invalidState("no key status") }
+        guard snapshot.contains("yubiKeyPresent") else {
+            throw TradeGateError.invalidState(snapshot.isEmpty ? "daemon did not answer" : "no key status")
+        }
     }
     if failures > 0 {
         exit(1)
@@ -93,6 +112,10 @@ func openDatabase() throws -> TradeGateDatabase {
 
 func pendingFromDatabase() -> Int {
     (try? openDatabase().pendingReviewCount()) ?? 0
+}
+
+func todayUnlocksFromDatabase() -> Int {
+    (try? openDatabase().todayUnlockCount()) ?? 0
 }
 
 func xpc(action: String, payload: String) -> String {

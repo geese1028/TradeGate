@@ -54,13 +54,13 @@ import Testing
                 return "YubiKey Manager (ykman) version: 5.9.2"
             }
             if arguments.contains("list") {
-                return "YubiKey 5C NFC (5.4.3) [OTP+CCID] Serial: 10000001\n"
+                return "YubiKey 5C NFC (5.7.1) [OTP+CCID] Serial: 10000001\n"
             }
             if arguments.contains("info") {
                 return """
                 Device type: YubiKey 5C NFC
                 Serial number: 10000001
-                Firmware version: 5.4.3
+                Firmware version: 5.7.1
                 Form factor: Keychain (USB-C)
                 Enabled USB interfaces: OTP, CCID
                 NFC transport is enabled

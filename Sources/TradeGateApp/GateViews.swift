@@ -1,3 +1,4 @@
+import AppKit
 import ServiceManagement
 import SwiftUI
 import TradeGateCore
@@ -9,7 +10,7 @@ struct MenuBarMenu: View {
     var body: some View {
         Text("TradeGate")
         Divider()
-        Text("YubiKey       \(menuYubiKeyStatus(model.snapshot.state))")
+        Text("钥匙       \(menuYubiKeyStatus(model.snapshot.state))")
         Text("待复盘        \(model.snapshot.pendingReviewCount)")
         Text("今日解锁      \(model.snapshot.todayUnlocks)")
         if let remaining = model.snapshot.unlockSecondsRemaining {
@@ -21,20 +22,35 @@ struct MenuBarMenu: View {
         Divider()
         Button("开始交易计划") {
             if model.snapshot.pendingReviewCount > 0 {
-                model.route = .reviewRequired
+                showGate(.reviewRequired)
             } else {
                 model.beginNewPlan()
+                showGate(.chooseApp)
             }
-            openWindow(id: "gate")
         }
         .disabled(normalPlanDisabled(model.snapshot))
-        Button("待复盘") { model.route = .reviewRequired; openWindow(id: "gate") }
-        Button("Journal") { model.route = .journal; openWindow(id: "gate") }
-        Button("Audit") { model.route = .audit; openWindow(id: "gate") }
-        Button("统计") { model.route = .dashboard; openWindow(id: "gate") }
+        Button("待复盘") { showGate(.reviewRequired) }
+        Button("日志") { showGate(.journal) }
+        Button("审计") { showGate(.audit) }
+        Button("统计") { showGate(.dashboard) }
         Divider()
-        Button("Emergency Override") { model.route = .emergency; openWindow(id: "gate") }
-        Button("Settings") { model.route = .settings; openWindow(id: "gate") }
+        Button("紧急解锁") { showGate(.emergency) }
+        Button("设置") { showGate(.settings) }
+        Divider()
+        Button("退出") { NSApplication.shared.terminate(nil) }
+    }
+
+    private func showGate(_ route: GateRoute) {
+        model.route = route
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        openWindow(id: "gate")
+        DispatchQueue.main.async {
+            for window in NSApp.windows where window.title == "TradeGate" {
+                window.makeKeyAndOrderFront(nil)
+                window.orderFrontRegardless()
+            }
+        }
     }
 }
 
@@ -73,11 +89,26 @@ struct GateRootView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .overlay(alignment: .top) {
                 Rectangle()
-                    .fill(Color.white.opacity(0.55))
+                    .fill(AquaTone.sheen)
                     .frame(height: 1)
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let noteText = model.noteText {
+                HStack {
+                    Text(noteText)
+                        .font(.callout)
+                        .foregroundStyle(AquaTone.ink)
+                    Spacer()
+                    Button("关闭") { model.noteText = nil }
+                        .aquaSecondary()
+                }
+                .padding(10)
+                .modifier(RaisedCard())
+                .padding(.horizontal, 18)
+                .padding(.bottom, 8)
+                .background(LinenBackground())
+            }
             if let errorText = model.errorText {
                 HStack {
                     Text(errorText)
@@ -123,7 +154,7 @@ struct HomeView: View {
                 }
                 InsetCard(padding: 0) {
                     VStack(spacing: 0) {
-                        labeled("YubiKey", menuYubiKeyStatus(model.snapshot.state))
+                        labeled("钥匙", menuYubiKeyStatus(model.snapshot.state))
                             .padding(.horizontal, 14)
                         hairline()
                         labeled("待复盘", "\(model.snapshot.pendingReviewCount)")
@@ -142,13 +173,13 @@ struct HomeView: View {
                         .padding(12)
                         .modifier(RaisedCard())
                 }
-                Button("开始一次交易计划") { model.beginNewPlan() }
+                Button("开始交易计划") { model.beginNewPlan() }
                     .disabled(normalPlanDisabled(model.snapshot))
                     .aquaPrimary(fills: true)
                 HStack(spacing: 10) {
-                    Button("Journal") { model.route = .journal }
-                    Button("Audit") { model.route = .audit }
-                    Button("Settings") { model.route = .settings }
+                    Button("日志") { model.route = .journal }
+                    Button("审计") { model.route = .audit }
+                    Button("设置") { model.route = .settings }
                 }
                 .aquaSecondary(fills: true)
                 Button("引导设置") { model.route = .onboarding }
@@ -164,7 +195,7 @@ struct ReviewRequiredView: View {
         ScreenScroll {
             VStack(spacing: 14) {
                 stepBack("返回首页") { model.route = .home }
-                EmbossedTitle(text: "REVIEW REQUIRED")
+                EmbossedTitle(text: "必须复盘")
                 if let item = model.reviewWork.first {
                     InsetCard {
                         VStack(alignment: .leading, spacing: 6) {
@@ -179,7 +210,7 @@ struct ReviewRequiredView: View {
                 }
                 VStack(spacing: 2) {
                     linenCaption("在完成复盘之前")
-                    linenCaption("无法正常解锁 YubiKey")
+                    linenCaption("无法正常解锁钥匙")
                 }
                 Button("开始复盘") {
                     guard let item = model.reviewWork.first else { return }
@@ -193,7 +224,7 @@ struct ReviewRequiredView: View {
                 .aquaPrimary(fills: true)
                 .disabled(model.reviewWork.isEmpty)
                 .task { await model.perform("reviewQueue") }
-                Button("Emergency Override →") { model.route = .emergency }
+                Button("紧急解锁 →") { model.route = .emergency }
                     .aquaDestructive(fills: true)
             }
         }
@@ -231,7 +262,7 @@ struct SymbolView: View {
                 if !model.recentSymbols.isEmpty {
                     Text("最近：")
                         .foregroundStyle(AquaTone.secondaryInk)
-                        .shadow(color: Color.white.opacity(0.75), radius: 0, y: 1)
+                        .shadow(color: AquaTone.sheen, radius: 0, y: 1)
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(model.recentSymbols, id: \.self) { symbol in
                             Button(symbol) { model.symbolText = symbol }
@@ -326,7 +357,7 @@ struct EntryFormView: View {
                     Text("账户比例").tag(PositionMode.percent)
                     Text("数量").tag(PositionMode.quantity)
                 }
-                TextField(model.entryPositionMode == .percent ? "百分比" : "Shares / Units", text: $model.positionText)
+                TextField(model.entryPositionMode == .percent ? "百分比" : "数量", text: $model.positionText)
             }
             Button("保存计划") { Task { await save() } }
                 .aquaPrimary(fills: true)
@@ -392,9 +423,9 @@ struct ExitFormView: View {
                 Text("数量").tag(ExitPositionMode.quantity)
             }
             if model.exitPositionMode != .all {
-                TextField(model.exitPositionMode == .percent ? "百分比" : "Shares / Units", text: $model.exitPositionText)
+                TextField(model.exitPositionMode == .percent ? "百分比" : "数量", text: $model.exitPositionText)
             }
-            Button("确认") {
+            Button("保存计划") {
                 guard let price = try? DecimalValue(parsing: model.exitPrice) else {
                     model.errorText = "离场价格要是一个正数，例如 77.4"
                     return
@@ -448,13 +479,16 @@ struct SignalPendingView: View {
                             .foregroundStyle(AquaTone.ink)
                         Text("进场信号尚未出现。")
                             .foregroundStyle(AquaTone.secondaryInk)
-                        Text("YubiKey 保持锁定。")
+                        Text("钥匙保持锁定。")
                             .foregroundStyle(AquaTone.secondaryInk)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                Button("信号出现了") { model.route = .entryForm }
-                    .aquaPrimary(fills: true)
+                Button("信号出现了") {
+                    model.signalAppeared = true
+                    model.route = .entryForm
+                }
+                .aquaPrimary(fills: true)
             }
         }
     }
@@ -470,7 +504,7 @@ struct ConfirmPlanView: View {
                         Text("\(model.draft.application.rawValue.uppercased()) / \(model.draft.symbol.normalized)")
                             .font(.headline)
                             .foregroundStyle(AquaTone.ink)
-                        Text(model.draft.planType == .entry ? "ENTRY PLAN" : "EXIT PLAN")
+                        Text(model.draft.planType == .entry ? "入场计划" : "出场计划")
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(AquaTone.secondaryInk)
                         if model.draft.entry != nil || model.draft.exit != nil {
@@ -479,20 +513,20 @@ struct ConfirmPlanView: View {
                         }
                         if let entry = model.draft.entry {
                             Text("运行级别 \(entry.timeframe?.rawValue ?? "-")")
-                            Text("运行级回调 \(entry.majorPullback?.rawValue ?? "-")")
-                            Text("中周期回调 \(entry.mediumPullback?.rawValue ?? "-")")
-                            Text("底背离 \(entry.smallDivergence?.rawValue ?? "-")")
+                            Text("运行级回调 \(pullbackLabel(entry.majorPullback))")
+                            Text("中周期回调 \(mediumLabel(entry.mediumPullback))")
+                            Text("底背离 \(divergenceLabel(entry.smallDivergence))")
                             Text("进场信号 \(entry.signalStatus == .appeared ? "已出现" : "未出现")")
                             Text("信号级别 \(entry.signalTimeframe?.rawValue ?? "-")")
                             Text("止损 \(entry.stopPrice?.storage ?? "-")")
-                            Text("计划仓位 \(entry.positionValue?.storage ?? "-") \(entry.positionMode?.rawValue ?? "")")
+                            Text("计划仓位 \(positionLabel(entry.positionValue?.storage, entry.positionMode))")
                         }
                         if let exit = model.draft.exit {
                             Text("运行级别 \(exit.timeframe?.rawValue ?? "-")")
-                            Text("次级运行状态 \(exit.secondaryState?.rawValue ?? "-")")
-                            Text("离场计划 \(exit.exitStrategy?.rawValue ?? "-")")
+                            Text("次级运行状态 \(exitStateLabel(exit.secondaryState))")
+                            Text("离场计划 \(exitStrategyLabel(exit.exitStrategy, exit.customExitStrategy))")
                             Text("离场价格 \(exit.plannedExitPrice?.storage ?? "-")")
-                            Text("离场仓位 \(exit.exitPositionMode?.rawValue ?? "-") \(exit.exitPositionValue?.storage ?? "")")
+                            Text("离场仓位 \(exitSizeLabel(exit.exitPositionMode, exit.exitPositionValue?.storage))")
                         }
                     }
                     .foregroundStyle(AquaTone.ink)
@@ -517,17 +551,17 @@ struct UnlockedView: View {
     var body: some View {
         VStack(spacing: 16) {
             Spacer(minLength: 12)
-            EmbossedTitle(text: "YubiKey")
+            EmbossedTitle(text: "钥匙")
             RecessedWell {
                 VStack(spacing: 8) {
-                    Text("🟢 UNLOCKED")
+                    Text("🟢 已解锁")
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(AquaTone.ink)
                     if let remaining = model.snapshot.unlockSecondsRemaining {
                         Text(String(format: "%02d:%02d", remaining / 60, remaining % 60))
                             .font(.system(size: 52, weight: .medium, design: .rounded).monospacedDigit())
                             .foregroundStyle(AquaTone.ink)
-                            .shadow(color: Color.white.opacity(0.8), radius: 0, y: 1)
+                            .shadow(color: AquaTone.sheen, radius: 0, y: 1)
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -544,10 +578,16 @@ struct ExecutionPromptView: View {
         ScreenScroll {
             VStack(alignment: .leading, spacing: 12) {
                 InsetCard {
-                    Text("刚才是否发生实际交易？")
-                        .font(.headline)
-                        .foregroundStyle(AquaTone.ink)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("刚才是否发生实际交易？")
+                            .font(.headline)
+                            .foregroundStyle(AquaTone.ink)
+                        if let line = executionPlanLine(model) {
+                            Text(line)
+                                .foregroundStyle(AquaTone.secondaryInk)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 if !model.traded {
                     Button("没有交易") {
@@ -598,7 +638,14 @@ struct ExecutionPromptView: View {
                     }
                     Button("确认成交") {
                         Task {
-                            guard let parsedPrice = try? DecimalValue(parsing: model.fillPrice) else { return }
+                            guard let parsedPrice = try? DecimalValue(parsing: model.fillPrice) else {
+                                model.errorText = "成交价格要是一个正数，例如 77.4"
+                                return
+                            }
+                            if model.fillPositionMode != .all, (try? DecimalValue(parsing: model.fillSize)) == nil {
+                                model.errorText = "仓位请填数字，例如 50 或 50%"
+                                return
+                            }
                             let input = ExecutionInput(
                                 planID: model.snapshot.activePlanID,
                                 price: parsedPrice,
@@ -615,6 +662,7 @@ struct ExecutionPromptView: View {
                 }
             }
         }
+        .task { await model.perform("journal") }
     }
 }
 
@@ -629,19 +677,19 @@ struct EntryReviewView: View {
             Picker("实际运行级别", selection: $model.actualTimeframe) {
                 ForEach(PlanTimeframe.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }
-            Text("运行级回调 \(plan?.majorPullback?.rawValue ?? "-")")
+            Text("运行级回调 \(pullbackLabel(plan?.majorPullback))")
             Picker("实际运行级回调", selection: $model.actualMajor) {
                 Text("一段").tag(MajorPullback.oneLeg)
                 Text("两段").tag(MajorPullback.twoLeg)
                 Text("横盘").tag(MajorPullback.sideways)
             }
-            Text("中周期 \(plan?.mediumPullback?.rawValue ?? "-")")
+            Text("中周期 \(mediumLabel(plan?.mediumPullback))")
             Picker("实际中周期", selection: $model.actualMedium) {
                 Text("一段").tag(MediumPullback.oneLeg)
                 Text("两段").tag(MediumPullback.twoLeg)
                 Text("不明确").tag(MediumPullback.unclear)
             }
-            Text("底背离 \(plan?.smallDivergence?.rawValue ?? "-")")
+            Text("底背离 \(divergenceLabel(plan?.smallDivergence))")
             Picker("实际底背离", selection: $model.actualDivergence) {
                 Text("5m").tag(SmallDivergenceTimeframe.m5)
                 Text("15m").tag(SmallDivergenceTimeframe.m15)
@@ -716,14 +764,14 @@ struct ExitReviewView: View {
             Picker("实际运行级别", selection: $model.actualTimeframe) {
                 ForEach(PlanTimeframe.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }
-            Text("次级运行状态 \(plan?.secondaryState?.rawValue ?? "-")")
+            Text("次级运行状态 \(exitStateLabel(plan?.secondaryState))")
             Picker("实际次级状态", selection: $model.actualExitState) {
                 Text("一段上涨").tag(ExitSecondaryState.oneLegUp)
                 Text("两段上涨").tag(ExitSecondaryState.twoLegUp)
                 Text("顶背离").tag(ExitSecondaryState.topDivergence)
                 Text("不明确").tag(ExitSecondaryState.unclear)
             }
-            Text("离场策略 \(plan?.exitStrategy?.rawValue ?? "-")")
+            Text("离场策略 \(exitStrategyLabel(plan?.exitStrategy, plan?.customExitStrategy))")
             Picker("实际离场策略", selection: $model.actualExitStrategy) {
                 Text("全部离场").tag(ExitStrategy.fullExitOnBreak)
                 Text("减仓等待").tag(ExitStrategy.reduceAndWait)
@@ -731,7 +779,7 @@ struct ExitReviewView: View {
             }
             Text("离场价格 \(plan?.plannedExitPrice?.storage ?? "-")")
             TextField("实际离场价格", text: $model.actualExitPrice)
-            Text("离场仓位 \(plan?.exitPositionMode?.rawValue ?? "ALL") \(plan?.exitPositionValue?.storage ?? "")")
+            Text("离场仓位 \(exitSizeLabel(plan?.exitPositionMode, plan?.exitPositionValue?.storage))")
             Picker("实际离场仓位", selection: $model.actualExitPositionMode) {
                 Text("全部").tag(ExitPositionMode.all)
                 Text("百分比").tag(ExitPositionMode.percent)
@@ -740,7 +788,7 @@ struct ExitReviewView: View {
             if model.actualExitPositionMode != .all {
                 TextField("实际仓位", text: $model.actualExitPositionText)
             }
-            Text("离场仓位 \(plan?.exitPositionMode?.rawValue ?? "ALL")")
+            Text("离场仓位 \(exitSizeLabel(plan?.exitPositionMode, nil))")
             Picker("是否按计划执行", selection: $model.adherence) {
                 Text("完全执行").tag(PlanAdherence.exact)
                 Text("有偏差").tag(PlanAdherence.deviation)
@@ -789,7 +837,7 @@ struct EmergencyView: View {
                         Text("⚠ 紧急解锁")
                             .font(.title3.weight(.semibold))
                             .foregroundStyle(AquaTone.destructiveBottom)
-                        Text("这次操作将永久写入 TradeGate Audit Log。")
+                        Text("这次操作将永久写入审计记录。")
                             .foregroundStyle(AquaTone.secondaryInk)
                         hairline()
                         Picker("应用", selection: $model.emergencyApplication) {
@@ -800,14 +848,14 @@ struct EmergencyView: View {
                             .textFieldStyle(.roundedBorder)
                         Picker("原因", selection: $model.emergencyCategory) {
                             Text("持仓风险").tag(EmergencyReasonCategory.positionRisk)
-                            Text("Broker / 系统故障").tag(EmergencyReasonCategory.brokerOrSystemFailure)
+                            Text("券商或系统故障").tag(EmergencyReasonCategory.brokerOrSystemFailure)
                             Text("无法完成正常计划").tag(EmergencyReasonCategory.cannotCompleteNormalPlan)
                             Text("行情异常").tag(EmergencyReasonCategory.abnormalMarket)
                             Text("其他").tag(EmergencyReasonCategory.other)
                         }
                         TextField("原因（至少 10 个字）", text: $model.emergencyReason)
                             .textFieldStyle(.roundedBorder)
-                        TextField("输入 EMERGENCY UNLOCK", text: $model.emergencyPhrase)
+                        TextField("输入确认短语 EMERGENCY UNLOCK", text: $model.emergencyPhrase)
                             .textFieldStyle(.roundedBorder)
                     }
                 }
@@ -903,13 +951,13 @@ struct DashboardView: View {
                 EmbossedTitle(text: "过去30天", size: .title3)
                 InsetCard(padding: 0) {
                     VStack(alignment: .leading, spacing: 0) {
-                        statLine("Unlock 次数 \(model.dashboard.unlockCount)")
+                        statLine("解锁次数 \(model.dashboard.unlockCount)")
                         hairline()
-                        statLine("Emergency Override 次数 \(model.dashboard.emergencyCount)")
+                        statLine("紧急解锁次数 \(model.dashboard.emergencyCount)")
                         hairline()
                         statLine("交易次数 \(model.dashboard.tradeCount)")
                         hairline()
-                        statLine("无成交 Unlock 次数 \(model.dashboard.noExecutionUnlockCount)")
+                        statLine("无成交的解锁次数 \(model.dashboard.noExecutionUnlockCount)")
                         hairline()
                         statLine(String(format: "计划执行率 %.0f%%", model.dashboard.adherenceRate * 100))
                         hairline()
@@ -943,9 +991,9 @@ struct JournalView: View {
                             .foregroundStyle(AquaTone.ink)
                         Text(entry.plan.symbol.normalized)
                         Text(entry.plan.application.rawValue.uppercased())
-                        Text(entry.plan.planType == .entry ? "ENTRY PLAN" : "EXIT PLAN")
-                        Text(entry.executions.isEmpty ? "NO EXECUTION" : "EXECUTION")
-                        Text(entry.reviewCompleted ? "REVIEW" : "REVIEW REQUIRED")
+                        Text(entry.plan.planType == .entry ? "入场计划" : "出场计划")
+                        Text(entry.executions.isEmpty ? "没有成交" : "已成交")
+                        Text(entry.reviewCompleted ? "已复盘" : "待复盘")
                             .foregroundStyle(entry.reviewCompleted ? AquaTone.secondaryInk : Color.orange)
                     }
                     .padding(.vertical, 4)
@@ -974,15 +1022,24 @@ struct AuditView: View {
                     }
                     TextField("标的", text: $model.auditSymbol)
                         .textFieldStyle(.roundedBorder)
-                    TextField("事件类型", text: $model.auditEventType)
-                        .textFieldStyle(.roundedBorder)
-                    Toggle("只看 Emergency", isOn: $model.auditEmergencyOnly)
+                    Picker("事件类型", selection: $model.auditEventType) {
+                        Text("全部").tag("")
+                        ForEach(AuditEventType.allCases, id: \.rawValue) { type in
+                            Text(tradeEventTitle(type)).tag(type.rawValue)
+                        }
+                    }
+                    Toggle("只看紧急解锁", isOn: $model.auditEmergencyOnly)
                 }
             }
             Button("筛选") { Task { await model.perform("audit", payload: model.auditPayload()) } }
                 .aquaPrimary(fills: true)
+            if model.audit.isEmpty {
+                Text("没有匹配的记录")
+                    .foregroundStyle(AquaTone.secondaryInk)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             List(model.audit, id: \.id) { event in
-                Text("\(event.timestampText)  \(event.eventType.rawValue)  \(event.symbol ?? "")")
+                Text("\(event.timestampText)  \(tradeEventTitle(event.eventType))  \(event.symbol ?? "")")
                     .foregroundStyle(AquaTone.ink)
             }
             .aquaList()
@@ -1004,7 +1061,7 @@ struct TradeDetailView: View {
                     InsetCard {
                         VStack(alignment: .leading, spacing: 8) {
                             ForEach(model.revisions, id: \.id) { revision in
-                                Text("Revision \(revision.revisionNumber)  \(revision.createdAt.formatted())")
+                                Text("修订 \(revision.revisionNumber)  \(revision.createdAt.formatted())")
                                     .foregroundStyle(AquaTone.ink)
                             }
                             if !model.revisions.isEmpty, !events.isEmpty {
@@ -1032,59 +1089,90 @@ struct TradeDetailView: View {
 
 private func tradeEventTitle(_ type: AuditEventType) -> String {
     switch type {
+    case .appStarted: "应用启动"
+    case .daemonStarted: "后台服务启动"
+    case .deviceInserted: "插入钥匙"
+    case .deviceRemoved: "拔出钥匙"
     case .planCreated: "计划创建"
     case .planUpdated: "计划修改"
+    case .planSubmitted: "计划提交"
     case .planApproved: "计划批准"
-    case .yubiKeyUnlocked: "YubiKey Unlock"
+    case .planCancelled: "计划取消"
+    case .signalConfirmed: "信号确认"
+    case .unlockRequested: "请求解锁"
+    case .unlockApproved: "批准解锁"
+    case .unlockDenied: "拒绝解锁"
+    case .yubiKeyUnlocked: "钥匙解锁"
+    case .yubiKeyLocked: "钥匙锁定"
+    case .deviceRemovedWhileUnlocked: "解锁期间拔出"
     case .executionConfirmed: "成交"
-    case .reviewCompleted: "复盘"
     case .noExecution: "没有交易"
-    default: type.rawValue
+    case .reviewRequired: "需要复盘"
+    case .reviewStarted: "开始复盘"
+    case .reviewCompleted: "复盘完成"
+    case .emergencyOverrideRequested: "请求紧急解锁"
+    case .emergencyOverrideApproved: "紧急解锁"
+    case .helperError: "工具错误"
+    case .yubiKeyError: "钥匙错误"
+    case .databaseError: "数据库错误"
     }
 }
 
 struct SettingsView: View {
     @ObservedObject var model: AppModel
     var body: some View {
-        Form {
-            stepBack("返回首页") { model.route = .home }
-            Text("Managed YubiKey \(model.snapshot.managedSerial ?? "未登记")")
-            Picker("Unlock duration", selection: $model.settings.unlockDurationSeconds) {
-                ForEach(UnlockDuration.allCases, id: \.rawValue) { Text("\($0.rawValue) sec").tag($0.rawValue) }
-            }
-            Stepper("Emergency countdown \(model.settings.emergencyCountdownSeconds) sec", value: $model.settings.emergencyCountdownSeconds, in: 5 ... 120)
-            Toggle("Start at login", isOn: $model.settings.startAtLogin)
-            Toggle("Notification", isOn: $model.settings.notificationsEnabled)
-            Text("Database \(TradeGatePaths.databasePath)")
-            Button("保存") {
-                Task {
-                    await model.perform("updateSettings", payload: (try? json(model.settings)) ?? "")
-                    if model.settings.startAtLogin {
-                        try? SMAppService.mainApp.register()
-                    } else {
-                        try? await SMAppService.mainApp.unregister()
+        ScreenScroll {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    stepBack("返回首页") { model.route = .home }
+                    Spacer()
+                    Button("退出") { NSApplication.shared.terminate(nil) }
+                        .aquaSecondary()
+                }
+                Text("已登记钥匙 \(model.snapshot.managedSerial ?? "未登记")")
+                Picker("解锁时长", selection: $model.settings.unlockDurationSeconds) {
+                    ForEach(UnlockDuration.allCases, id: \.rawValue) { Text("\($0.rawValue) 秒").tag($0.rawValue) }
+                }
+                Stepper("紧急倒计时 \(model.settings.emergencyCountdownSeconds) 秒", value: $model.settings.emergencyCountdownSeconds, in: 5 ... 120)
+                Toggle("登录时打开", isOn: $model.settings.startAtLogin)
+                Toggle("通知", isOn: $model.settings.notificationsEnabled)
+                Text("数据库 \(TradeGatePaths.databasePath)")
+                    .textSelection(.enabled)
+                Button("保存") {
+                    Task {
+                        await model.perform("updateSettings", payload: (try? json(model.settings)) ?? "")
+                        if model.settings.startAtLogin {
+                            try? SMAppService.mainApp.register()
+                        } else {
+                            try? await SMAppService.mainApp.unregister()
+                        }
                     }
                 }
-            }
-            .aquaPrimary(fills: true)
-            Button("Export JSON") {
-                Task { await writeExport(model, name: "tradegate-export.json", action: "export") }
-            }
-            .aquaSecondary(fills: true)
-            Button("Export CSV") {
-                Task { await writeExport(model, name: "tradegate-export.csv", action: "exportCSV") }
-            }
-            .aquaSecondary(fills: true)
-            Button("Backup Database") {
-                Task {
-                    let destination = TradeGatePaths.supportDirectory
-                        .appendingPathComponent("backup-\(UUID().uuidString).sqlite").path
-                    await model.perform("backup", payload: #"{"path":"\#(destination)"}"#)
+                .aquaPrimary(fills: true)
+                Button("导出 JSON") {
+                    Task { await writeExport(model, name: "tradegate-export.json", action: "export") }
                 }
+                .aquaSecondary(fills: true)
+                Button("导出 CSV") {
+                    Task { await writeExport(model, name: "tradegate-export.csv", action: "exportCSV") }
+                }
+                .aquaSecondary(fills: true)
+                Button("备份数据库") {
+                    Task {
+                        let destination = TradeGatePaths.supportDirectory
+                            .appendingPathComponent("backup-\(UUID().uuidString).sqlite").path
+                        let reply = await model.perform("backup", payload: #"{"path":"\#(destination)"}"#)
+                        if reply.contains("\"ok\":true") {
+                            model.noteText = "已备份到 \(destination)"
+                            model.errorText = nil
+                        } else if model.errorText == nil {
+                            model.errorText = "备份没有完成。"
+                        }
+                    }
+                }
+                .aquaSecondary(fills: true)
             }
-            .aquaSecondary(fills: true)
         }
-        .aquaForm()
         .task { await model.perform("settings") }
     }
 }
@@ -1097,36 +1185,52 @@ struct OnboardingView: View {
                 stepBack("返回首页") { model.route = .home }
                 InsetCard(padding: 0) {
                     VStack(alignment: .leading, spacing: 0) {
-                        statusLine(model.snapshot.warning == "无法连接 TradeGate daemon。FIDO 状态未知。" ? "daemon：未连接" : "daemon：已连接")
+                        statusLine(model.snapshot.warning?.contains("登录功能状态未知") == true ? "后台服务：未连接" : "后台服务：已连接")
                         hairline()
                         statusLine("钥匙工具：\(model.snapshot.helperStatus ?? "未知")")
                         hairline()
-                        statusLine(model.snapshot.yubiKeyPresent ? "检测到 YubiKey \(model.snapshot.yubiKeyProduct ?? "")" : "请插入 YubiKey")
+                        statusLine(model.snapshot.yubiKeyPresent ? "检测到钥匙 \(model.snapshot.yubiKeyProduct ?? "")" : "请插入钥匙")
                         hairline()
-                        statusLine("Serial: \(model.snapshot.yubiKeySerial ?? "-")")
+                        statusLine("序列号 \(model.snapshot.yubiKeySerial ?? "-")")
                         hairline()
-                        statusLine("Firmware: \(model.snapshot.yubiKeyFirmware ?? "-")")
+                        statusLine("固件 \(model.snapshot.yubiKeyFirmware ?? "-")")
                         hairline()
-                        statusLine(model.snapshot.yubiKeyPresent ? "FIDO2 / U2F：可以控制" : "FIDO2 / U2F：尚未检测到可管理的钥匙")
+                        statusLine(model.snapshot.yubiKeyPresent ? "登录功能：可以控制" : "登录功能：尚未检测到可管理的钥匙")
                     }
                     .padding(.vertical, 4)
                 }
                 InsetCard {
-                    Text("TradeGate 将临时关闭该 YubiKey 的 FIDO 功能，以增加交易账户登录前的操作摩擦。它不会删除 Passkey 或重置 YubiKey。")
+                    Text("TradeGate 会暂时关闭这把钥匙的登录功能，让你在登录交易账户之前多走一步。它不会删除通行密钥，也不会重置钥匙。")
                         .foregroundStyle(AquaTone.secondaryInk)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                Button("测试 LOCK / UNLOCK / LOCK") {
+                Text("下面这个测试会真的把钥匙锁上、打开、再锁上，用来确认可以控制它。大约要半分钟，期间按钮会停住。")
+                    .foregroundStyle(AquaTone.secondaryInk)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button(model.keyTestRunning ? "正在测试钥匙，请稍等" : "测试锁定、解锁、再锁定") {
                     Task {
-                        let serial = model.snapshot.yubiKeySerial ?? "12345678"
+                        guard let serial = model.snapshot.yubiKeySerial else {
+                            model.errorText = "还没有读到钥匙序列号。请确认钥匙已经插上。"
+                            return
+                        }
+                        model.keyTestRunning = true
+                        defer { model.keyTestRunning = false }
                         let registered = await model.perform("register", payload: #"{"id":"\#(serial)"}"#)
-                        guard registered.contains("\"ok\":true") else { return }
+                        guard registered.contains("\"ok\":true") else {
+                            if model.errorText == nil {
+                                model.errorText = "测试没有完成。请再试一次，这期间不要拔钥匙。"
+                            }
+                            return
+                        }
                         let cycled = await model.perform("onboardingCycle", payload: #"{"id":"\#(serial)"}"#)
                         if cycled.contains("\"ok\":true") {
                             model.route = .home
+                        } else if model.errorText == nil {
+                            model.errorText = "测试没有完成。请再试一次，这期间不要拔钥匙。"
                         }
                     }
                 }
+                .disabled(model.keyTestRunning)
                 .aquaPrimary(fills: true)
             }
         }
@@ -1139,29 +1243,41 @@ private func writeExport(_ model: AppModel, name: String, action: String) async 
     guard let data = reply.data(using: .utf8),
           let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
           let result = object["result"]
-    else { return }
+    else {
+        if model.errorText == nil {
+            model.errorText = "导出没有完成。"
+        }
+        return
+    }
     let output: Data? = if let text = result as? String {
         text.data(using: .utf8)
     } else {
         try? JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys])
     }
     guard let output else { return }
+    let file = TradeGatePaths.supportDirectory.appendingPathComponent(name)
     try? FileManager.default.createDirectory(at: TradeGatePaths.supportDirectory, withIntermediateDirectories: true)
-    try? output.write(to: TradeGatePaths.supportDirectory.appendingPathComponent(name), options: .atomic)
+    do {
+        try output.write(to: file, options: .atomic)
+        model.noteText = "已导出到 \(file.path)"
+        model.errorText = nil
+    } catch {
+        model.errorText = "导出没有完成。"
+    }
 }
 
 private func menuYubiKeyStatus(_ state: GateState) -> String {
     switch state {
     case .unlocked:
-        "🟢 UNLOCKED"
+        "🟢 已解锁"
     case .lockStateUnknown:
-        "⚠️ UNKNOWN"
+        "⚠️ 未知"
     case .errorFailClosed:
-        "⚠️ ERROR"
+        "⚠️ 错误"
     case .reviewRequired:
-        "⚠️ REVIEW"
+        "⚠️ 待复盘"
     default:
-        "🔒 LOCKED"
+        "🔒 已锁定"
     }
 }
 
@@ -1201,22 +1317,69 @@ func decodeEnvelope<T: Decodable>(_: T.Type, from reply: String) -> T? {
     return (try? decoder.decode(Envelope<T>.self, from: data))?.result
 }
 
+private func adaptiveColor(light: NSColor, dark: NSColor) -> Color {
+    Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
+    })
+}
+
 private enum AquaTone {
-    static let ink = Color(red: 0.20, green: 0.17, blue: 0.13)
-    static let secondaryInk = Color(red: 0.40, green: 0.35, blue: 0.28)
-    static let hairline = Color(red: 0.55, green: 0.49, blue: 0.40).opacity(0.45)
+    static let ink = adaptiveColor(
+        light: NSColor(srgbRed: 0.20, green: 0.17, blue: 0.13, alpha: 1),
+        dark: NSColor(srgbRed: 0.94, green: 0.91, blue: 0.84, alpha: 1)
+    )
+    static let secondaryInk = adaptiveColor(
+        light: NSColor(srgbRed: 0.40, green: 0.35, blue: 0.28, alpha: 1),
+        dark: NSColor(srgbRed: 0.74, green: 0.68, blue: 0.58, alpha: 1)
+    )
+    static let hairline = adaptiveColor(
+        light: NSColor(srgbRed: 0.55, green: 0.49, blue: 0.40, alpha: 0.45),
+        dark: NSColor(srgbRed: 0.62, green: 0.55, blue: 0.44, alpha: 0.35)
+    )
+    static let sheen = adaptiveColor(
+        light: NSColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.90),
+        dark: NSColor(srgbRed: 1, green: 0.95, blue: 0.88, alpha: 0.16)
+    )
+    static let sheenSoft = adaptiveColor(
+        light: NSColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.38),
+        dark: NSColor(srgbRed: 1, green: 0.95, blue: 0.88, alpha: 0.08)
+    )
     static let primaryTop = Color(red: 0.49, green: 0.72, blue: 0.97)
     static let primaryBottom = Color(red: 0.13, green: 0.39, blue: 0.78)
     static let destructiveTop = Color(red: 0.90, green: 0.44, blue: 0.39)
     static let destructiveBottom = Color(red: 0.64, green: 0.15, blue: 0.13)
-    static let metalTop = Color(red: 0.99, green: 0.985, blue: 0.965)
-    static let metalBottom = Color(red: 0.78, green: 0.75, blue: 0.68)
-    static let linenTop = Color(red: 0.94, green: 0.92, blue: 0.87)
-    static let linenBottom = Color(red: 0.83, green: 0.80, blue: 0.72)
-    static let cardTop = Color(red: 0.995, green: 0.992, blue: 0.98)
-    static let cardBottom = Color(red: 0.96, green: 0.95, blue: 0.925)
-    static let wellTop = Color(red: 0.75, green: 0.72, blue: 0.65)
-    static let wellBottom = Color(red: 0.93, green: 0.91, blue: 0.86)
+    static let metalTop = adaptiveColor(
+        light: NSColor(srgbRed: 0.99, green: 0.985, blue: 0.965, alpha: 1),
+        dark: NSColor(srgbRed: 0.38, green: 0.35, blue: 0.30, alpha: 1)
+    )
+    static let metalBottom = adaptiveColor(
+        light: NSColor(srgbRed: 0.78, green: 0.75, blue: 0.68, alpha: 1),
+        dark: NSColor(srgbRed: 0.22, green: 0.20, blue: 0.17, alpha: 1)
+    )
+    static let linenTop = adaptiveColor(
+        light: NSColor(srgbRed: 0.94, green: 0.92, blue: 0.87, alpha: 1),
+        dark: NSColor(srgbRed: 0.20, green: 0.18, blue: 0.16, alpha: 1)
+    )
+    static let linenBottom = adaptiveColor(
+        light: NSColor(srgbRed: 0.83, green: 0.80, blue: 0.72, alpha: 1),
+        dark: NSColor(srgbRed: 0.11, green: 0.10, blue: 0.09, alpha: 1)
+    )
+    static let cardTop = adaptiveColor(
+        light: NSColor(srgbRed: 0.995, green: 0.992, blue: 0.98, alpha: 1),
+        dark: NSColor(srgbRed: 0.26, green: 0.24, blue: 0.21, alpha: 1)
+    )
+    static let cardBottom = adaptiveColor(
+        light: NSColor(srgbRed: 0.96, green: 0.95, blue: 0.925, alpha: 1),
+        dark: NSColor(srgbRed: 0.18, green: 0.16, blue: 0.14, alpha: 1)
+    )
+    static let wellTop = adaptiveColor(
+        light: NSColor(srgbRed: 0.75, green: 0.72, blue: 0.65, alpha: 1),
+        dark: NSColor(srgbRed: 0.10, green: 0.09, blue: 0.08, alpha: 1)
+    )
+    static let wellBottom = adaptiveColor(
+        light: NSColor(srgbRed: 0.93, green: 0.91, blue: 0.86, alpha: 1),
+        dark: NSColor(srgbRed: 0.20, green: 0.18, blue: 0.16, alpha: 1)
+    )
 }
 
 private struct LinenBackground: View {
@@ -1228,7 +1391,7 @@ private struct LinenBackground: View {
                 endPoint: .bottom
             )
             LinearGradient(
-                colors: [Color.white.opacity(0.38), Color.white.opacity(0)],
+                colors: [AquaTone.sheenSoft, Color.clear],
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -1246,7 +1409,7 @@ private struct EmbossedTitle: View {
         Text(text)
             .font(size)
             .foregroundStyle(AquaTone.ink)
-            .shadow(color: Color.white.opacity(0.9), radius: 0, y: 1)
+            .shadow(color: AquaTone.sheen, radius: 0, y: 1)
     }
 }
 
@@ -1281,7 +1444,7 @@ private struct RaisedCard: ViewModifier {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .strokeBorder(
                         LinearGradient(
-                            colors: [Color.white.opacity(0.95), AquaTone.hairline],
+                            colors: [AquaTone.sheen, AquaTone.hairline],
                             startPoint: .top,
                             endPoint: .bottom
                         ),
@@ -1346,11 +1509,84 @@ private struct RecessedWell<Content: View>: View {
                     )
                     .allowsHitTesting(false)
             )
-            .shadow(color: Color.white.opacity(0.75), radius: 0, y: 1)
+            .shadow(color: AquaTone.sheen, radius: 0, y: 1)
     }
 }
 
 @MainActor
+private func executionPlanLine(_ model: AppModel) -> String? {
+    if let id = model.snapshot.activePlanID, let entry = model.journal.first(where: { $0.plan.id == id }) {
+        let kind = entry.plan.planType == .entry ? "入场" : "出场"
+        return "\(entry.plan.application.rawValue.uppercased()) / \(entry.plan.symbol.normalized) · \(kind)"
+    }
+    guard !model.draft.symbol.normalized.isEmpty else { return nil }
+    let kind = model.draft.planType == .entry ? "入场" : "出场"
+    return "\(model.draft.application.rawValue.uppercased()) / \(model.draft.symbol.normalized) · \(kind)"
+}
+
+private func pullbackLabel(_ value: MajorPullback?) -> String {
+    switch value {
+    case .oneLeg: "一段回调"
+    case .twoLeg: "两段回调"
+    case .sideways: "横盘"
+    case nil: "-"
+    }
+}
+
+private func mediumLabel(_ value: MediumPullback?) -> String {
+    switch value {
+    case .oneLeg: "一段回调"
+    case .twoLeg: "两段回调"
+    case .unclear: "不明确"
+    case nil: "-"
+    }
+}
+
+private func divergenceLabel(_ value: SmallDivergenceTimeframe?) -> String {
+    switch value {
+    case .notYet: "尚未出现"
+    case .other: "其他"
+    case nil: "-"
+    default: value?.rawValue ?? "-"
+    }
+}
+
+private func positionLabel(_ amount: String?, _ mode: PositionMode?) -> String {
+    switch mode {
+    case .percent: "\(amount ?? "-")%"
+    case .quantity: "\(amount ?? "-") 数量"
+    case nil: amount ?? "-"
+    }
+}
+
+private func exitStateLabel(_ value: ExitSecondaryState?) -> String {
+    switch value {
+    case .oneLegUp: "一段上涨"
+    case .twoLegUp: "两段上涨"
+    case .topDivergence: "顶背离"
+    case .unclear: "不明确"
+    case nil: "-"
+    }
+}
+
+private func exitStrategyLabel(_ value: ExitStrategy?, _ custom: String?) -> String {
+    switch value {
+    case .fullExitOnBreak: "跌破次级别全部离场"
+    case .reduceAndWait: "减仓等待"
+    case .custom: custom?.isEmpty == false ? "自定义：\(custom ?? "")" : "自定义"
+    case nil: "-"
+    }
+}
+
+private func exitSizeLabel(_ mode: ExitPositionMode?, _ amount: String?) -> String {
+    switch mode {
+    case .all: "全部"
+    case .percent: "\(amount ?? "-")%"
+    case .quantity: "\(amount ?? "-") 数量"
+    case nil: "-"
+    }
+}
+
 private func stepBack(_ title: String, _ action: @escaping () -> Void) -> some View {
     Button(title, action: action)
         .buttonStyle(.plain)
@@ -1418,7 +1654,7 @@ private struct AquaPushFace<Label: View>: View {
                     .strokeBorder(
                         LinearGradient(
                             colors: [
-                                Color.white.opacity(kind == .secondary ? 0.9 : 0.5),
+                                AquaTone.sheen,
                                 Color.black.opacity(0.32),
                             ],
                             startPoint: .top,
@@ -1448,7 +1684,7 @@ private struct AquaPushFace<Label: View>: View {
     }
 
     private var textShadow: Color {
-        kind == .secondary ? Color.white.opacity(0.85) : Color.black.opacity(0.25)
+        kind == .secondary ? AquaTone.sheen : Color.black.opacity(0.25)
     }
 
     private var faceGradient: LinearGradient {
@@ -1514,7 +1750,7 @@ private func linenCaption(_ text: String) -> some View {
     Text(text)
         .font(.callout)
         .foregroundStyle(AquaTone.secondaryInk)
-        .shadow(color: Color.white.opacity(0.75), radius: 0, y: 1)
+        .shadow(color: AquaTone.sheen, radius: 0, y: 1)
 }
 
 private func statLine(_ text: String) -> some View {

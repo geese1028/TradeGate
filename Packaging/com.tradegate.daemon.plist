@@ -4,6 +4,10 @@
 <dict>
     <key>Label</key>
     <string>com.tradegate.daemon</string>
+    <key>AssociatedBundleIdentifiers</key>
+    <array>
+        <string>com.tradegate.app</string>
+    </array>
     <key>BundleProgram</key>
     <string>Contents/MacOS/TradeGateDaemon</string>
     <key>MachServices</key>

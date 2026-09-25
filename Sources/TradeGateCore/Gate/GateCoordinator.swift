@@ -1,5 +1,10 @@
 import Foundation
 
+public enum TradeGateBuild {
+    /// Bumped when the LaunchDaemon must be re-registered so launchd loads the current plist.
+    public static let serviceGeneration = "2"
+}
+
 public struct GateSnapshot: Equatable, Sendable, Codable {
     public var state: GateState
     public var pendingReviewCount: Int
@@ -15,6 +20,7 @@ public struct GateSnapshot: Equatable, Sendable, Codable {
     public var onboardingComplete: Bool
     public var managedSerial: String?
     public var helperStatus: String?
+    public var serviceGeneration: String?
 
     public init(
         state: GateState,
@@ -30,7 +36,8 @@ public struct GateSnapshot: Equatable, Sendable, Codable {
         needsExecutionPrompt: Bool = false,
         onboardingComplete: Bool = false,
         managedSerial: String? = nil,
-        helperStatus: String? = nil
+        helperStatus: String? = nil,
+        serviceGeneration: String? = TradeGateBuild.serviceGeneration
     ) {
         self.state = state
         self.pendingReviewCount = pendingReviewCount
@@ -46,6 +53,7 @@ public struct GateSnapshot: Equatable, Sendable, Codable {
         self.onboardingComplete = onboardingComplete
         self.managedSerial = managedSerial
         self.helperStatus = helperStatus
+        self.serviceGeneration = serviceGeneration
     }
 }
 
@@ -96,7 +104,8 @@ public actor GateCoordinator {
             needsExecutionPrompt: needsExecutionPrompt,
             onboardingComplete: (try? database.flag("onboarding_completed")) == "1",
             managedSerial: managedSerial,
-            helperStatus: yubiKey.helperStatus()
+            helperStatus: yubiKey.helperStatus(),
+            serviceGeneration: TradeGateBuild.serviceGeneration
         )
     }
 

@@ -41,6 +41,7 @@ final class AppModel: ObservableObject {
     @Published var recentSymbols: [String] = []
     @Published var settings = TradeGateSettings()
     @Published var errorText: String?
+    @Published var noteText: String?
     @Published var symbolText = ""
     @Published var signalAppeared = true
     @Published var stopText = ""
@@ -89,6 +90,7 @@ final class AppModel: ObservableObject {
     @Published var actualExitPositionMode = ExitPositionMode.all
     @Published var actualExitPositionText = ""
     @Published var draft = TradePlan(application: .ibkr, symbol: Symbol(raw: ""), planType: .entry, entry: EntryPlanFields())
+    @Published var keyTestRunning = false
     private let inProcess: (coordinator: GateCoordinator, database: TradeGateDatabase)?
     private var lastState: GateState?
 
@@ -107,6 +109,7 @@ final class AppModel: ObservableObject {
             }
         } else {
             inProcess = nil
+            NSApp.setActivationPolicy(.regular)
             let daemon = SMAppService.daemon(plistName: "com.tradegate.daemon.plist")
             do {
                 try daemon.register()
@@ -132,7 +135,7 @@ final class AppModel: ObservableObject {
                 pendingReviewCount: snapshot.pendingReviewCount,
                 todayUnlocks: snapshot.todayUnlocks,
                 yubiKeyPresent: false,
-                warning: "无法连接 TradeGate daemon。FIDO 状态未知。"
+                warning: daemonUnavailableWarning()
             )
             return
         }
@@ -140,8 +143,9 @@ final class AppModel: ObservableObject {
             notify(next)
         }
         lastState = next.state
+        let promptWasPending = snapshot.needsExecutionPrompt
         snapshot = next
-        if next.needsExecutionPrompt {
+        if next.needsExecutionPrompt, !promptWasPending || route == .home || route == .unlocked {
             route = .executionPrompt
         } else if next.state == .reviewRequired, route == .home {
             route = .reviewRequired
@@ -153,6 +157,7 @@ final class AppModel: ObservableObject {
         let reply = await call(action, payload)
         if reply.contains("\"ok\":false") {
             errorText = readableError(in: reply)
+            noteText = nil
         } else if !reply.isEmpty {
             errorText = nil
         }
@@ -275,17 +280,21 @@ final class AppModel: ObservableObject {
             )
         }
         return await withCheckedContinuation { continuation in
+            let once = OneReply(continuation)
             let connection = NSXPCConnection(machServiceName: TradeGatePaths.machService, options: .privileged)
             connection.remoteObjectInterface = NSXPCInterface(with: TradeGateXPC.self)
+            connection.invalidationHandler = { once.resume("") }
             connection.resume()
             guard let proxy = connection.remoteObjectProxy as? TradeGateXPC else {
                 connection.invalidate()
-                continuation.resume(returning: "")
                 return
             }
             proxy.perform(action: action, payload: payload) { reply in
+                once.resume(reply)
                 connection.invalidate()
-                continuation.resume(returning: reply)
+            }
+            DispatchQueue.global().asyncAfter(deadline: .now() + (action == "snapshot" ? 8 : 90)) {
+                once.resume("")
             }
         }
     }
@@ -338,18 +347,43 @@ final class AppModel: ObservableObject {
         let content = UNMutableNotificationContent()
         switch snapshot.state {
         case .unlocked:
-            content.title = "YubiKey unlocked"
+            content.title = "钥匙已解锁"
         case .locked, .planRequired, .signalPending, .ready:
-            content.title = "YubiKey locked"
+            content.title = "钥匙已锁定"
         case .reviewRequired:
-            content.title = "Review required"
+            content.title = "需要复盘"
         case .lockStateUnknown:
-            content.title = "YubiKey removed before relock"
+            guard snapshot.warning?.contains("重新锁定之前被拔出") == true else { return }
+            content.title = "钥匙在重新锁定之前被拔出"
         default:
             return
         }
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
+    }
+
+    private func daemonUnavailableWarning() -> String {
+        guard inProcess == nil else {
+            return "无法连接后台服务。登录功能状态未知。"
+        }
+        return "请在系统设置 → 通用 → 登录项与扩展 → 应用后台活动里允许 TradeGate。登录功能状态未知。"
+    }
+}
+
+private final class OneReply: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<String, Never>?
+
+    init(_ continuation: CheckedContinuation<String, Never>) {
+        self.continuation = continuation
+    }
+
+    func resume(_ value: String) {
+        lock.lock()
+        let current = continuation
+        continuation = nil
+        lock.unlock()
+        current?.resume(returning: value)
     }
 }
 
