@@ -1,8 +1,27 @@
 import Testing
 @testable import TradeGateCore
 
+@Test func unsupportedYkmanVersionStaysFailClosed() async throws {
+    let selection = await YubiKeyBackend.select(
+        environment: [
+            "TRADEGATE_YKMAN": "/tmp/ykman",
+            "TRADEGATE_DEV_YKMAN": "1",
+        ],
+        runner: { _, arguments in
+            if arguments == ["--version"] {
+                return "YubiKey Manager (ykman) version: 5.8.0"
+            }
+            return ""
+        }
+    )
+    #expect(selection.warning != nil)
+    await #expect(throws: YubiKeyControlError.self) {
+        try await selection.controller.unlock(deviceID: "1")
+    }
+}
+
 @Test func missingYkmanStaysFailClosed() async throws {
-    let selection = YubiKeyBackend.select(environment: ["TRADEGATE_YKMAN": "/tmp/tradegate-missing-ykman"])
+    let selection = await YubiKeyBackend.select(environment: ["TRADEGATE_YKMAN": "/tmp/tradegate-missing-ykman"])
     #expect(selection.warning != nil)
     let devices = try await selection.controller.listDevices()
     #expect(devices.isEmpty)

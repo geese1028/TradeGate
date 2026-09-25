@@ -78,14 +78,18 @@ public actor FailClosedYubiKeyController: YubiKeyControlling {
 }
 
 public enum YubiKeyBackend {
-    public static func select(environment: [String: String] = ProcessInfo.processInfo.environment) -> (controller: any YubiKeyControlling, warning: String?) {
+    public static func select(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        runner: @escaping YkmanCLIController.Runner = YkmanCLIController.processRunner
+    ) async -> (controller: any YubiKeyControlling, warning: String?) {
         if environment["TRADEGATE_MOCK"] == "1" {
             return (MockYubiKeyController(), nil)
         }
         let path = environment["TRADEGATE_YKMAN"] ?? "/opt/homebrew/bin/ykman"
         let allowUntrusted = environment["TRADEGATE_DEV_YKMAN"] == "1"
         do {
-            let controller = try YkmanCLIController(executable: path, allowUntrusted: allowUntrusted)
+            let controller = try YkmanCLIController(executable: path, allowUntrusted: allowUntrusted, runner: runner)
+            _ = try await controller.ykmanVersion()
             return (controller, nil)
         } catch {
             return (FailClosedYubiKeyController(reason: "\(error)"), "\(error)")

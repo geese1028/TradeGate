@@ -4,7 +4,7 @@ import TradeGateCore
 let directory = TradeGatePaths.supportDirectory
 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 let database = try TradeGateDatabase(path: TradeGatePaths.databasePath)
-let selection = YubiKeyBackend.select()
+let selection = await YubiKeyBackend.select()
 let yubiKey = selection.controller
 if let warning = selection.warning {
     _ = try? database.appendAudit(AuditEventDraft(eventType: .helperError, metadata: ["message": warning]))
