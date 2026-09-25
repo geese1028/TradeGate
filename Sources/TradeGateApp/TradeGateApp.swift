@@ -107,7 +107,13 @@ final class AppModel: ObservableObject {
             }
         } else {
             inProcess = nil
-            try? SMAppService.daemon(plistName: "com.tradegate.daemon.plist").register()
+            let daemon = SMAppService.daemon(plistName: "com.tradegate.daemon.plist")
+            do {
+                try daemon.register()
+                NSLog("TradeGate SMAppService.register succeeded status=\(daemon.status)")
+            } catch {
+                NSLog("TradeGate SMAppService.register failed status=\(daemon.status) error=\(error)")
+            }
         }
         Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor in await self?.refresh() }

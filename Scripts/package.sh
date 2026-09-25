@@ -16,4 +16,9 @@ src=$(shasum -a 256 .build/release/TradeGateApp | awk '{print $1}')
 cli=$(shasum -a 256 "$root/Helpers/tradegate" | awk '{print $1}')
 test "$app" = "$src"
 test "$app" != "$cli"
+# SMAppService rejects a LaunchDaemon plist that is not sealed into the app signature.
+codesign --force --sign - "$root/MacOS/TradeGateDaemon"
+codesign --force --sign - "$root/Helpers/tradegate"
+codesign --force --sign - "dist/TradeGate.app"
+codesign --verify --deep --strict "dist/TradeGate.app"
 echo "packaged dist/TradeGate.app"
