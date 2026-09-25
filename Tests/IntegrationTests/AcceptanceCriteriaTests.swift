@@ -232,27 +232,27 @@ import Testing
     let harness = try AcceptanceHarness()
     await harness.coordinator.boot()
     let plan = try await harness.coordinator.createPlan(entryPlan())
-    let start = Date(timeIntervalSince1970: 5_000)
+    let start = Date(timeIntervalSince1970: 5000)
     try await harness.coordinator.approveAndUnlock(planID: plan.id, now: start)
     _ = await harness.coordinator.snapshot(now: start.addingTimeInterval(30))
     #expect(await harness.coordinator.currentState() == .unlocked)
     #expect(try await harness.mock.getState(deviceID: "111").fidoAvailable)
     _ = await harness.coordinator.snapshot(now: start.addingTimeInterval(120))
     #expect(await harness.coordinator.currentState() != .unlocked)
-    #expect(!(try await harness.mock.getState(deviceID: "111").fidoAvailable))
+    #expect(try await !(harness.mock.getState(deviceID: "111").fidoAvailable))
 }
 
 @Test func pendingReviewBlocksADifferentSymbol() async throws {
     let harness = try AcceptanceHarness()
     await harness.coordinator.boot()
     let nvda = try await harness.coordinator.createPlan(entryPlan())
-    try await harness.coordinator.approveAndUnlock(planID: nvda.id, now: Date(timeIntervalSince1970: 9_000))
-    await harness.coordinator.expireUnlockWindow(at: Date(timeIntervalSince1970: 9_200))
+    try await harness.coordinator.approveAndUnlock(planID: nvda.id, now: Date(timeIntervalSince1970: 9000))
+    await harness.coordinator.expireUnlockWindow(at: Date(timeIntervalSince1970: 9200))
     _ = try await harness.coordinator.confirmExecution(ExecutionInput(
         planID: nvda.id,
-        price: try DecimalValue(parsing: "10"),
+        price: DecimalValue(parsing: "10"),
         positionMode: .quantity,
-        positionValue: try DecimalValue(parsing: "1")
+        positionValue: DecimalValue(parsing: "1")
     ))
     var btc = try entryPlan()
     btc.application = .kraken
@@ -264,14 +264,14 @@ import Testing
     } catch let denial as UnlockDenial {
         #expect(denial == .reviewRequired)
     }
-    #expect(!(try await harness.mock.getState(deviceID: "111").fidoAvailable))
+    #expect(try await !(harness.mock.getState(deviceID: "111").fidoAvailable))
 }
 
 @Test func lockThatLeavesFIDOEnabledIsUnknown() async throws {
     let harness = try AcceptanceHarness()
     await harness.coordinator.boot()
     let plan = try await harness.coordinator.createPlan(entryPlan())
-    let start = Date(timeIntervalSince1970: 15_000)
+    let start = Date(timeIntervalSince1970: 15000)
     try await harness.coordinator.approveAndUnlock(planID: plan.id, now: start)
     await harness.mock.setLockLeavesEnabled(true)
     _ = await harness.coordinator.snapshot(now: start.addingTimeInterval(120))
@@ -285,7 +285,7 @@ import Testing
     let harness = try AcceptanceHarness()
     await harness.coordinator.boot()
     let plan = try await harness.coordinator.createPlan(entryPlan())
-    let start = Date(timeIntervalSince1970: 17_000)
+    let start = Date(timeIntervalSince1970: 17000)
     try await harness.coordinator.approveAndUnlock(planID: plan.id, now: start)
     await harness.mock.setLockLeavesEnabled(true)
     _ = await harness.coordinator.snapshot(now: start.addingTimeInterval(120))
@@ -293,7 +293,7 @@ import Testing
     await harness.mock.setLockLeavesEnabled(false)
     _ = await harness.coordinator.snapshot(now: start.addingTimeInterval(130))
     #expect(await harness.coordinator.currentState() != .lockStateUnknown)
-    #expect(!(try await harness.mock.getState(deviceID: "111").fidoAvailable))
+    #expect(try await !(harness.mock.getState(deviceID: "111").fidoAvailable))
     var next = try entryPlan()
     next.symbol = Symbol(raw: "DIA")
     next = try await harness.coordinator.createPlan(next)
@@ -305,7 +305,7 @@ import Testing
     let harness = try AcceptanceHarness()
     await harness.coordinator.boot()
     let first = try await harness.coordinator.createPlan(entryPlan())
-    let start = Date(timeIntervalSince1970: 16_000)
+    let start = Date(timeIntervalSince1970: 16000)
     try await harness.coordinator.approveAndUnlock(planID: first.id, now: start)
     await harness.mock.setLockLeavesEnabled(true)
     _ = await harness.coordinator.snapshot(now: start.addingTimeInterval(120))
@@ -331,7 +331,7 @@ import Testing
         #expect(Bool(false))
     } catch is YubiKeyControlError {}
     #expect(await harness.coordinator.currentState() != .unlocked)
-    #expect(!(try await harness.mock.getState(deviceID: "111").fidoAvailable))
+    #expect(try await !(harness.mock.getState(deviceID: "111").fidoAvailable))
 }
 
 @Test func finishingAnEmergencyReviewClearsTheGate() async throws {
@@ -343,8 +343,8 @@ import Testing
         reasonCategory: .positionRisk,
         reasonText: "need to cut risk",
         confirmationPhrase: "EMERGENCY UNLOCK"
-    ), now: Date(timeIntervalSince1970: 14_000))
-    await harness.coordinator.expireUnlockWindow(at: Date(timeIntervalSince1970: 14_200))
+    ), now: Date(timeIntervalSince1970: 14000))
+    await harness.coordinator.expireUnlockWindow(at: Date(timeIntervalSince1970: 14200))
     #expect(await harness.coordinator.currentState() == .reviewRequired)
     let review = try harness.database.startEmergencyReview(overrideID: override.id)
     _ = try harness.database.completeEmergencyReview(
@@ -357,10 +357,10 @@ import Testing
             howToAvoidNextTime: "write the plan first"
         )
     )
-    _ = await harness.coordinator.snapshot(now: Date(timeIntervalSince1970: 14_300))
+    _ = await harness.coordinator.snapshot(now: Date(timeIntervalSince1970: 14300))
     #expect(await harness.coordinator.currentState() != .reviewRequired)
     let plan = try await harness.coordinator.createPlan(entryPlan())
-    try await harness.coordinator.approveAndUnlock(planID: plan.id, now: Date(timeIntervalSince1970: 14_400))
+    try await harness.coordinator.approveAndUnlock(planID: plan.id, now: Date(timeIntervalSince1970: 14400))
     #expect(try await harness.mock.getState(deviceID: "111").fidoAvailable)
 }
 
@@ -368,13 +368,13 @@ import Testing
     let harness = try AcceptanceHarness()
     await harness.coordinator.boot()
     let first = try await harness.coordinator.createPlan(entryPlan())
-    try await harness.coordinator.approveAndUnlock(planID: first.id, now: Date(timeIntervalSince1970: 13_000))
-    await harness.coordinator.expireUnlockWindow(at: Date(timeIntervalSince1970: 13_200))
+    try await harness.coordinator.approveAndUnlock(planID: first.id, now: Date(timeIntervalSince1970: 13000))
+    await harness.coordinator.expireUnlockWindow(at: Date(timeIntervalSince1970: 13200))
     let execution = try await harness.coordinator.confirmExecution(ExecutionInput(
         planID: first.id,
-        price: try DecimalValue(parsing: "11"),
+        price: DecimalValue(parsing: "11"),
         positionMode: .quantity,
-        positionValue: try DecimalValue(parsing: "1")
+        positionValue: DecimalValue(parsing: "1")
     ))
     let review = try harness.database.startReview(executionID: execution.id)
     _ = try harness.database.completeEntryReview(reviewID: review.id, actuals: entryActuals())
@@ -382,7 +382,7 @@ import Testing
     var second = try entryPlan()
     second.symbol = Symbol(raw: "AAPL")
     second = try await harness.coordinator.createPlan(second)
-    try await harness.coordinator.approveAndUnlock(planID: second.id, now: Date(timeIntervalSince1970: 13_300))
+    try await harness.coordinator.approveAndUnlock(planID: second.id, now: Date(timeIntervalSince1970: 13300))
     #expect(try await harness.mock.getState(deviceID: "111").fidoAvailable)
 }
 
@@ -390,15 +390,15 @@ import Testing
     let harness = try AcceptanceHarness()
     await harness.coordinator.boot()
     let first = try await harness.coordinator.createPlan(entryPlan())
-    try await harness.coordinator.approveAndUnlock(planID: first.id, now: Date(timeIntervalSince1970: 12_000))
-    await harness.coordinator.expireUnlockWindow(at: Date(timeIntervalSince1970: 12_200))
+    try await harness.coordinator.approveAndUnlock(planID: first.id, now: Date(timeIntervalSince1970: 12000))
+    await harness.coordinator.expireUnlockWindow(at: Date(timeIntervalSince1970: 12200))
     _ = try await harness.coordinator.recordNoTrade(planID: first.id, disposition: .noExecution)
     #expect(try harness.database.pendingReviewCount() == 0)
     var second = try entryPlan()
     second.symbol = Symbol(raw: "MSFT")
     second = try await harness.coordinator.createPlan(second)
     #expect(await harness.coordinator.currentState() == .ready)
-    try await harness.coordinator.approveAndUnlock(planID: second.id, now: Date(timeIntervalSince1970: 12_300))
+    try await harness.coordinator.approveAndUnlock(planID: second.id, now: Date(timeIntervalSince1970: 12300))
     #expect(try await harness.mock.getState(deviceID: "111").fidoAvailable)
 }
 
@@ -413,12 +413,12 @@ import Testing
             timeframe: .oneDay,
             secondaryState: .topDivergence,
             exitStrategy: .fullExitOnBreak,
-            plannedExitPrice: try DecimalValue(parsing: "500"),
+            plannedExitPrice: DecimalValue(parsing: "500"),
             exitPositionMode: .all
         )
     ))
     #expect(await harness.coordinator.currentState() == .ready)
-    try await harness.coordinator.approveAndUnlock(planID: plan.id, now: Date(timeIntervalSince1970: 11_000))
+    try await harness.coordinator.approveAndUnlock(planID: plan.id, now: Date(timeIntervalSince1970: 11000))
     #expect(try await harness.mock.getState(deviceID: "111").fidoAvailable)
 }
 
@@ -433,12 +433,12 @@ import Testing
     try harness.database.updateSettings(settings)
     await harness.coordinator.boot()
     let plan = try await harness.coordinator.createPlan(entryPlan())
-    let start = Date(timeIntervalSince1970: 8_000)
+    let start = Date(timeIntervalSince1970: 8000)
     try await harness.coordinator.approveAndUnlock(planID: plan.id, now: start)
     _ = await harness.coordinator.snapshot(now: start.addingTimeInterval(29))
     #expect(await harness.coordinator.currentState() == .unlocked)
     _ = await harness.coordinator.snapshot(now: start.addingTimeInterval(30))
-    #expect(!(try await harness.mock.getState(deviceID: "111").fidoAvailable))
+    #expect(try await !(harness.mock.getState(deviceID: "111").fidoAvailable))
 }
 
 @Test func signalAppearedUpdatesTheSavedPlan() async throws {
@@ -452,7 +452,7 @@ import Testing
     plan.entry?.positionValue = nil
     let encoder = JSONEncoder()
     encoder.dateEncodingStrategy = .iso8601
-    let waiting = String(data: try encoder.encode(plan), encoding: .utf8) ?? ""
+    let waiting = try String(data: encoder.encode(plan), encoding: .utf8) ?? ""
     let created = await GateRouter.perform(
         coordinator: harness.coordinator,
         database: harness.database,
@@ -472,7 +472,7 @@ import Testing
     plan.entry?.stopPrice = try DecimalValue(parsing: "10")
     plan.entry?.positionMode = .quantity
     plan.entry?.positionValue = try DecimalValue(parsing: "1")
-    let appeared = String(data: try encoder.encode(plan), encoding: .utf8) ?? ""
+    let appeared = try String(data: encoder.encode(plan), encoding: .utf8) ?? ""
     let updated = await GateRouter.perform(
         coordinator: harness.coordinator,
         database: harness.database,

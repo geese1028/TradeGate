@@ -164,19 +164,33 @@ final class AppModel: ObservableObject {
     private func absorb(_ action: String, reply: String) {
         switch action {
         case "journal":
-            if let value = decodeEnvelope([JournalEntry].self, from: reply) { journal = value }
+            if let value = decodeEnvelope([JournalEntry].self, from: reply) {
+                journal = value
+            }
         case "audit":
-            if let value = decodeEnvelope([AuditEvent].self, from: reply) { audit = value }
+            if let value = decodeEnvelope([AuditEvent].self, from: reply) {
+                audit = value
+            }
         case "dashboard":
-            if let value = decodeEnvelope(DashboardStats.self, from: reply) { dashboard = value }
+            if let value = decodeEnvelope(DashboardStats.self, from: reply) {
+                dashboard = value
+            }
         case "recentSymbols":
-            if let value = decodeEnvelope([String].self, from: reply) { recentSymbols = value }
+            if let value = decodeEnvelope([String].self, from: reply) {
+                recentSymbols = value
+            }
         case "settings":
-            if let value = decodeEnvelope(TradeGateSettings.self, from: reply) { settings = value }
+            if let value = decodeEnvelope(TradeGateSettings.self, from: reply) {
+                settings = value
+            }
         case "reviewQueue":
-            if let value = decodeEnvelope([ReviewWorkItem].self, from: reply) { reviewWork = value }
+            if let value = decodeEnvelope([ReviewWorkItem].self, from: reply) {
+                reviewWork = value
+            }
         case "plans":
-            if let value = decodeEnvelope([TradePlan].self, from: reply) { plans = value }
+            if let value = decodeEnvelope([TradePlan].self, from: reply) {
+                plans = value
+            }
         default:
             break
         }

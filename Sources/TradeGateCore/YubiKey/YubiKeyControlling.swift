@@ -62,9 +62,13 @@ public actor FailClosedYubiKeyController: YubiKeyControlling {
         self.reason = reason
     }
 
-    public func helperStatus() async -> String { reason }
+    public func helperStatus() async -> String {
+        reason
+    }
 
-    public func listDevices() async throws -> [YubiKeyDevice] { [] }
+    public func listDevices() async throws -> [YubiKeyDevice] {
+        []
+    }
 
     public func getState(deviceID _: String) async throws -> YubiKeyState {
         YubiKeyState(present: false, fido2Enabled: false, u2fEnabled: false)
@@ -202,7 +206,9 @@ public actor MockYubiKeyController: YubiKeyControlling {
         devices[serialNumber] = device
     }
 
-    public func helperStatus() async -> String { "mock" }
+    public func helperStatus() async -> String {
+        "mock"
+    }
 
     public func listDevices() async throws -> [YubiKeyDevice] {
         listCount += 1

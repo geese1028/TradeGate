@@ -82,7 +82,7 @@ public actor GateCoordinator {
         let today = (try? database.todayUnlockCount(now: now)) ?? 0
         let device = lastDevices.first { $0.serialNumber == managedSerial } ?? lastDevices.first
         let remaining = unlockDeadline.map { max(0, Int($0.timeIntervalSince(now))) }
-        return GateSnapshot(
+        return await GateSnapshot(
             state: state,
             pendingReviewCount: pending,
             todayUnlocks: today,
@@ -96,7 +96,7 @@ public actor GateCoordinator {
             needsExecutionPrompt: needsExecutionPrompt,
             onboardingComplete: (try? database.flag("onboarding_completed")) == "1",
             managedSerial: managedSerial,
-            helperStatus: await yubiKey.helperStatus()
+            helperStatus: yubiKey.helperStatus()
         )
     }
 

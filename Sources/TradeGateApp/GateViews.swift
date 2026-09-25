@@ -925,27 +925,27 @@ struct JournalView: View {
         VStack(spacing: 8) {
             stepBack("返回首页") { model.route = .home }
             List(model.journal, id: \.plan.id) { entry in
-            Button {
-                model.selectedPlanID = entry.plan.id
-                model.route = .tradeDetail
-            } label: {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(entry.plan.createdAt.formatted(date: .numeric, time: .omitted))
-                        .font(.headline)
-                        .foregroundStyle(AquaTone.ink)
-                    Text(entry.plan.symbol.normalized)
-                    Text(entry.plan.application.rawValue.uppercased())
-                    Text(entry.plan.planType == .entry ? "ENTRY PLAN" : "EXIT PLAN")
-                    Text(entry.executions.isEmpty ? "NO EXECUTION" : "EXECUTION")
-                    Text(entry.reviewCompleted ? "REVIEW" : "REVIEW REQUIRED")
-                        .foregroundStyle(entry.reviewCompleted ? AquaTone.secondaryInk : Color.orange)
+                Button {
+                    model.selectedPlanID = entry.plan.id
+                    model.route = .tradeDetail
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(entry.plan.createdAt.formatted(date: .numeric, time: .omitted))
+                            .font(.headline)
+                            .foregroundStyle(AquaTone.ink)
+                        Text(entry.plan.symbol.normalized)
+                        Text(entry.plan.application.rawValue.uppercased())
+                        Text(entry.plan.planType == .entry ? "ENTRY PLAN" : "EXIT PLAN")
+                        Text(entry.executions.isEmpty ? "NO EXECUTION" : "EXECUTION")
+                        Text(entry.reviewCompleted ? "REVIEW" : "REVIEW REQUIRED")
+                            .foregroundStyle(entry.reviewCompleted ? AquaTone.secondaryInk : Color.orange)
+                    }
+                    .padding(.vertical, 4)
                 }
-                .padding(.vertical, 4)
+                .buttonStyle(.borderless)
             }
-            .buttonStyle(.borderless)
-        }
-        .aquaList()
-        .task { await model.perform("journal") }
+            .aquaList()
+            .task { await model.perform("journal") }
         }
     }
 }
@@ -999,7 +999,7 @@ struct TradeDetailView: View {
                                 Text("Revision \(revision.revisionNumber)  \(revision.createdAt.formatted())")
                                     .foregroundStyle(AquaTone.ink)
                             }
-                            if !model.revisions.isEmpty && !events.isEmpty {
+                            if !model.revisions.isEmpty, !events.isEmpty {
                                 hairline()
                             }
                             ForEach(events, id: \.id) { event in
@@ -1145,15 +1145,15 @@ private func writeExport(_ model: AppModel, name: String, action: String) async 
 private func menuYubiKeyStatus(_ state: GateState) -> String {
     switch state {
     case .unlocked:
-        return "🟢 UNLOCKED"
+        "🟢 UNLOCKED"
     case .lockStateUnknown:
-        return "⚠️ UNKNOWN"
+        "⚠️ UNKNOWN"
     case .errorFailClosed:
-        return "⚠️ ERROR"
+        "⚠️ ERROR"
     case .reviewRequired:
-        return "⚠️ REVIEW"
+        "⚠️ REVIEW"
     default:
-        return "🔒 LOCKED"
+        "🔒 LOCKED"
     }
 }
 
@@ -1411,7 +1411,7 @@ private struct AquaPushFace<Label: View>: View {
                         LinearGradient(
                             colors: [
                                 Color.white.opacity(kind == .secondary ? 0.9 : 0.5),
-                                Color.black.opacity(0.32)
+                                Color.black.opacity(0.32),
                             ],
                             startPoint: .top,
                             endPoint: .bottom
@@ -1420,7 +1420,7 @@ private struct AquaPushFace<Label: View>: View {
                     )
             )
             .overlay {
-                if isPressed && isEnabled {
+                if isPressed, isEnabled {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .stroke(Color.black.opacity(0.28), lineWidth: 3)
                         .blur(radius: 1)
@@ -1457,14 +1457,14 @@ private struct AquaPushFace<Label: View>: View {
             top = AquaTone.metalTop
             bottom = AquaTone.metalBottom
         }
-        if isPressed && isEnabled {
+        if isPressed, isEnabled {
             return LinearGradient(colors: [bottom, bottom.opacity(0.92)], startPoint: .top, endPoint: .bottom)
         }
         return LinearGradient(
             stops: [
                 .init(color: top, location: 0),
                 .init(color: top.opacity(0.92), location: 0.42),
-                .init(color: bottom, location: 1)
+                .init(color: bottom, location: 1),
             ],
             startPoint: .top,
             endPoint: .bottom

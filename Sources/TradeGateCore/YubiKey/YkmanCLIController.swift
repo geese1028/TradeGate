@@ -16,7 +16,9 @@ public actor YkmanCLIController: YubiKeyControlling {
         self.runner = runner
     }
 
-    public func helperStatus() async -> String { "ykman" }
+    public func helperStatus() async -> String {
+        "ykman"
+    }
 
     public func listDevices() async throws -> [YubiKeyDevice] {
         let output = try run(.list)
@@ -116,7 +118,7 @@ public actor YkmanCLIController: YubiKeyControlling {
         posix_spawn_file_actions_addclose(&actions, errPipe[1])
         let argv = ([executable] + arguments).map { strdup($0) }
         defer { argv.forEach { free($0) } }
-        var cargs: [UnsafeMutablePointer<CChar>?] = argv.map { $0 } + [nil]
+        var cargs: [UnsafeMutablePointer<CChar>?] = argv.map(\.self) + [nil]
         var pid: pid_t = 0
         let rc = posix_spawn(&pid, executable, &actions, &attr, &cargs, environ)
         close(outPipe[1])
@@ -130,7 +132,7 @@ public actor YkmanCLIController: YubiKeyControlling {
         let stderr = String(data: Data(reading: errPipe[0]), encoding: .utf8) ?? ""
         var status: Int32 = 0
         waitpid(pid, &status, 0)
-        let code = (status & 0x7f) == 0 ? (status >> 8) & 0xff : status
+        let code = (status & 0x7F) == 0 ? (status >> 8) & 0xFF : status
         guard code == 0 else {
             throw YubiKeyControlError.failed(stderr.isEmpty ? stdout : stderr)
         }

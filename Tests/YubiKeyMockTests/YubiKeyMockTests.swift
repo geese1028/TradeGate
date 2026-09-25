@@ -89,7 +89,7 @@ import Testing
     #expect(!state.fidoAvailable)
 }
 
-@Test func ykmanSixStaysFailClosed() async throws {
+@Test func ykmanSixStaysFailClosed() async {
     let selection = await YubiKeyBackend.select(
         environment: [
             "TRADEGATE_YKMAN": "/tmp/ykman",
