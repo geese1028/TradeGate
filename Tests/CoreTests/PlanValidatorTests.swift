@@ -57,6 +57,10 @@ import Testing
     let value = try DecimalValue(parsing: "182.50")
     #expect(value.storage == "182.5")
     #expect(value.decimal == Decimal(string: "182.5"))
+    let percent = try DecimalValue(parsing: "50%")
+    #expect(percent.storage == "50")
+    let widePercent = try DecimalValue(parsing: "50％")
+    #expect(widePercent.storage == "50")
 }
 
 @Test func emergencyPhraseMustMatch() {

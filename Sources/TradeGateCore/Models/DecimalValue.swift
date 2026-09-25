@@ -9,7 +9,10 @@ public struct DecimalValue: Equatable, Sendable {
     public let storage: String
 
     public init(parsing raw: String) throws {
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        var trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasSuffix("%") || trimmed.hasSuffix("％") {
+            trimmed = String(trimmed.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         guard Self.isPlainDecimal(trimmed) else {
             throw DecimalValueError.invalid
         }

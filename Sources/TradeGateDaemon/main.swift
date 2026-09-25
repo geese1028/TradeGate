@@ -17,6 +17,7 @@ let listener = NSXPCListener(machServiceName: TradeGatePaths.machService)
 listener.delegate = delegate
 listener.resume()
 while true {
-    try await Task.sleep(for: .seconds(1))
-    _ = await coordinator.snapshot()
+    let snapshot = await coordinator.snapshot()
+    let pause: Double = snapshot.state == .unlocked ? 1 : 5
+    try await Task.sleep(for: .seconds(pause))
 }

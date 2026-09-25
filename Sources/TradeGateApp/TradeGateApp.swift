@@ -155,28 +155,29 @@ final class AppModel: ObservableObject {
             errorText = nil
         }
         await refresh()
-        if let value = await decodeEnvelope([TradePlan].self, from: call("plans")) {
-            plans = value
-        }
-        if let value = await decodeEnvelope([JournalEntry].self, from: call("journal")) {
-            journal = value
-        }
-        if let value = await decodeEnvelope([AuditEvent].self, from: call("audit", auditPayload())) {
-            audit = value
-        }
-        if let value = await decodeEnvelope(DashboardStats.self, from: call("dashboard")) {
-            dashboard = value
-        }
-        if let value = await decodeEnvelope([String].self, from: call("recentSymbols")) {
-            recentSymbols = value
-        }
-        if let value = await decodeEnvelope(TradeGateSettings.self, from: call("settings")) {
-            settings = value
-        }
-        if let value = await decodeEnvelope([ReviewWorkItem].self, from: call("reviewQueue")) {
-            reviewWork = value
-        }
+        absorb(action, reply: reply)
         return reply
+    }
+
+    private func absorb(_ action: String, reply: String) {
+        switch action {
+        case "journal":
+            if let value = decodeEnvelope([JournalEntry].self, from: reply) { journal = value }
+        case "audit":
+            if let value = decodeEnvelope([AuditEvent].self, from: reply) { audit = value }
+        case "dashboard":
+            if let value = decodeEnvelope(DashboardStats.self, from: reply) { dashboard = value }
+        case "recentSymbols":
+            if let value = decodeEnvelope([String].self, from: reply) { recentSymbols = value }
+        case "settings":
+            if let value = decodeEnvelope(TradeGateSettings.self, from: reply) { settings = value }
+        case "reviewQueue":
+            if let value = decodeEnvelope([ReviewWorkItem].self, from: reply) { reviewWork = value }
+        case "plans":
+            if let value = decodeEnvelope([TradePlan].self, from: reply) { plans = value }
+        default:
+            break
+        }
     }
 
     func beginExecutionReport() {
@@ -279,6 +280,22 @@ final class AppModel: ObservableObject {
               let error = object["error"] as? String
         else {
             return "操作没有完成。"
+        }
+        return translatedValidation(error)
+    }
+
+    private func translatedValidation(_ error: String) -> String {
+        if error.contains("missingPosition") || error.contains("missingExitPosition") {
+            return "仓位没有填上。百分比可以写 50 或 50%。"
+        }
+        if error.contains("percentOutOfRange") {
+            return "百分比要在 0 和 100 之间。"
+        }
+        if error.contains("missingPlannedExitPrice") || error.contains("exitPriceNotPositive") {
+            return "离场价格要是一个正数。"
+        }
+        if error.contains("positionNotPositive") || error.contains("stopPriceNotPositive") {
+            return "价格和仓位要是正数。"
         }
         return error
     }

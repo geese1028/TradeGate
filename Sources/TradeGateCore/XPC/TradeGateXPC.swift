@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 @objc public protocol TradeGateXPC {
@@ -50,6 +51,10 @@ public enum TradeGatePaths {
         {
             return URL(fileURLWithPath: override, isDirectory: true)
         }
+        if geteuid() == 0, let home = consoleUserHome() {
+            return URL(fileURLWithPath: home, isDirectory: true)
+                .appendingPathComponent("Library/Application Support/TradeGate", isDirectory: true)
+        }
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support")
         return base.appendingPathComponent("TradeGate", isDirectory: true)
@@ -60,4 +65,13 @@ public enum TradeGatePaths {
     }
 
     public static let machService = "com.tradegate.daemon"
+
+    private static func consoleUserHome() -> String? {
+        var info = stat()
+        guard stat("/dev/console", &info) == 0, info.st_uid != 0 else { return nil }
+        guard let password = getpwuid(info.st_uid), let directory = password.pointee.pw_dir else { return nil }
+        let home = String(cString: directory)
+        guard home.hasPrefix("/Users/") else { return nil }
+        return home
+    }
 }

@@ -3,6 +3,12 @@ import SQLite3
 import Testing
 @testable import TradeGateCore
 
+@Test func snapshotListsTheKeyOnce() async throws {
+    let harness = try AcceptanceHarness()
+    _ = await harness.coordinator.snapshot()
+    #expect(await harness.mock.listCount == 1)
+}
+
 @Test func snapshotNamesTheHelper() async throws {
     let harness = try AcceptanceHarness()
     let snapshot = await harness.coordinator.snapshot()

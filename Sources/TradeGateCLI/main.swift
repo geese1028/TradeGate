@@ -96,7 +96,17 @@ func pendingFromDatabase() -> Int {
 }
 
 func xpc(action: String, payload: String) -> String {
-    let connection = NSXPCConnection(machServiceName: TradeGatePaths.machService)
+    let userAgent = xpc(action: action, payload: payload, privileged: false, timeout: 0.4)
+    if userAgent.contains("\"ok\":true") {
+        return userAgent
+    }
+    return xpc(action: action, payload: payload, privileged: true, timeout: 2)
+}
+
+func xpc(action: String, payload: String, privileged: Bool, timeout: Double) -> String {
+    let connection = privileged
+        ? NSXPCConnection(machServiceName: TradeGatePaths.machService, options: .privileged)
+        : NSXPCConnection(machServiceName: TradeGatePaths.machService)
     connection.remoteObjectInterface = NSXPCInterface(with: TradeGateXPC.self)
     connection.resume()
     defer { connection.invalidate() }
@@ -107,7 +117,7 @@ func xpc(action: String, payload: String) -> String {
         reply = value
         semaphore.signal()
     }
-    _ = semaphore.wait(timeout: .now() + 2)
+    _ = semaphore.wait(timeout: .now() + timeout)
     return reply
 }
 

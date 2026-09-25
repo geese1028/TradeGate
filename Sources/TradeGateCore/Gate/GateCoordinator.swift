@@ -59,6 +59,8 @@ public actor GateCoordinator {
     private var needsExecutionPrompt = false
     private var warning: String?
     private var seenDevice = false
+    private var lastDevices: [YubiKeyDevice] = []
+    private var lastProbe: Date = .distantPast
 
     public init(database: TradeGateDatabase, yubiKey: any YubiKeyControlling) {
         self.database = database
@@ -78,8 +80,7 @@ public actor GateCoordinator {
         await reconcile(now: now)
         let pending = (try? database.pendingReviewCount()) ?? 0
         let today = (try? database.todayUnlockCount(now: now)) ?? 0
-        let devices = await (try? yubiKey.listDevices()) ?? []
-        let device = devices.first { $0.serialNumber == managedSerial } ?? devices.first
+        let device = lastDevices.first { $0.serialNumber == managedSerial } ?? lastDevices.first
         let remaining = unlockDeadline.map { max(0, Int($0.timeIntervalSince(now))) }
         return GateSnapshot(
             state: state,
@@ -312,7 +313,11 @@ public actor GateCoordinator {
             await lockAfterWindow(now: now)
             return
         }
+        let probeInterval: TimeInterval = state == .unlocked ? 2 : 8
+        guard now.timeIntervalSince(lastProbe) >= probeInterval else { return }
+        lastProbe = now
         let devices = await (try? yubiKey.listDevices()) ?? []
+        lastDevices = devices
         if managedSerial == nil {
             managedSerial = try? database.enabledManagedSerial()
         }

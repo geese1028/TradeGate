@@ -243,6 +243,7 @@ struct SymbolView: View {
                 .aquaPrimary(fills: true)
             }
         }
+        .task { await model.perform("recentSymbols") }
     }
 }
 
@@ -387,10 +388,24 @@ struct ExitFormView: View {
                 TextField(model.exitPositionMode == .percent ? "百分比" : "Shares / Units", text: $model.exitPositionText)
             }
             Button("确认") {
-                model.draft.exit?.plannedExitPrice = try? DecimalValue(parsing: model.exitPrice)
+                guard let price = try? DecimalValue(parsing: model.exitPrice) else {
+                    model.errorText = "离场价格要是一个正数，例如 77.4"
+                    return
+                }
+                let size: DecimalValue?
+                if model.exitPositionMode == .all {
+                    size = nil
+                } else {
+                    guard let parsed = try? DecimalValue(parsing: model.exitPositionText) else {
+                        model.errorText = "仓位请填数字，例如 50 或 50%"
+                        return
+                    }
+                    size = parsed
+                }
+                model.draft.exit?.plannedExitPrice = price
                 model.draft.exit?.customExitStrategy = model.exitCustom
                 model.draft.exit?.exitPositionMode = model.exitPositionMode
-                model.draft.exit?.exitPositionValue = model.exitPositionMode == .all ? nil : (try? DecimalValue(parsing: model.exitPositionText))
+                model.draft.exit?.exitPositionValue = size
                 Task {
                     guard await model.saveDraft() else { return }
                     model.route = .confirm
@@ -1033,6 +1048,7 @@ struct SettingsView: View {
             .aquaSecondary(fills: true)
         }
         .aquaForm()
+        .task { await model.perform("settings") }
     }
 }
 

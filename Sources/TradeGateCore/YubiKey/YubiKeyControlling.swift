@@ -155,6 +155,7 @@ public actor MockYubiKeyController: YubiKeyControlling {
     private var scriptedError: YubiKeyControlError?
     private var unlockLeavesDisabled = false
     private var lockLeavesEnabled = false
+    public private(set) var listCount = 0
     public private(set) var lockCount = 0
     public private(set) var unlockCount = 0
 
@@ -204,7 +205,8 @@ public actor MockYubiKeyController: YubiKeyControlling {
     public func helperStatus() async -> String { "mock" }
 
     public func listDevices() async throws -> [YubiKeyDevice] {
-        devices.values.filter(\.present).map {
+        listCount += 1
+        return devices.values.filter(\.present).map {
             YubiKeyDevice(
                 serialNumber: $0.serialNumber,
                 productName: $0.productName,
