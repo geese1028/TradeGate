@@ -138,6 +138,51 @@ import Testing
     }
 }
 
+@Test func reviewQueueSeparatesExitAndEmergency() throws {
+    let database = try makeDatabase()
+    var exit = TradePlan(
+        application: .ibkr,
+        symbol: Symbol(raw: "QQQ"),
+        planType: .exit,
+        exit: ExitPlanFields(
+            timeframe: .oneDay,
+            secondaryState: .oneLegUp,
+            exitStrategy: .fullExitOnBreak,
+            plannedExitPrice: try DecimalValue(parsing: "500"),
+            exitPositionMode: .all
+        )
+    )
+    exit = try database.createPlan(exit)
+    _ = try database.confirmExecution(ExecutionInput(
+        planID: exit.id,
+        price: try DecimalValue(parsing: "501"),
+        positionMode: .all
+    ))
+    _ = try database.recordEmergencyOverride(EmergencyOverrideInput(
+        application: .kraken,
+        symbol: Symbol(raw: "BTC"),
+        reasonCategory: .positionRisk,
+        reasonText: "need to cut risk",
+        confirmationPhrase: "EMERGENCY UNLOCK"
+    ))
+    let queue = try database.reviewQueue()
+    #expect(queue.contains { $0.kind == "exit" && $0.symbol == "QQQ" })
+    #expect(queue.contains { $0.kind == "emergency" && $0.symbol == "BTC" })
+    let emergency = try #require(queue.first { $0.kind == "emergency" })
+    let review = try database.startEmergencyReview(overrideID: emergency.targetID)
+    _ = try database.completeEmergencyReview(
+        reviewID: review.id,
+        answers: EmergencyReviewAnswers(
+            why: "risk was live",
+            didTrade: false,
+            changedPosition: false,
+            couldHaveUsedNormalFlow: false,
+            howToAvoidNextTime: "write the plan earlier"
+        )
+    )
+    #expect(!(try database.reviewQueue().contains { $0.kind == "emergency" }))
+}
+
 private func entryPlan() throws -> TradePlan {
     TradePlan(
         application: .ibkr,

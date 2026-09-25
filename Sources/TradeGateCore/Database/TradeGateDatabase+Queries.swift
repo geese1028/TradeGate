@@ -58,6 +58,33 @@ public struct DashboardStats: Equatable, Sendable, Codable {
     }
 }
 
+public struct ReviewWorkItem: Equatable, Sendable, Codable, Identifiable {
+    public var kind: String
+    public var targetID: String
+    public var symbol: String
+    public var application: TradingApplication
+    public var plan: TradePlan?
+    public var execution: ExecutionRecord?
+
+    public var id: String { "\(kind)-\(targetID)" }
+
+    public init(
+        kind: String,
+        targetID: String,
+        symbol: String,
+        application: TradingApplication,
+        plan: TradePlan?,
+        execution: ExecutionRecord?
+    ) {
+        self.kind = kind
+        self.targetID = targetID
+        self.symbol = symbol
+        self.application = application
+        self.plan = plan
+        self.execution = execution
+    }
+}
+
 public struct JournalEntry: Equatable, Sendable, Codable {
     public var plan: TradePlan
     public var executions: [ExecutionRecord]
@@ -302,6 +329,77 @@ extension TradeGateDatabase {
     private func allRevisions() throws -> [PlanRevision] {
         let plans = try listPlans()
         return try plans.flatMap { try revisions(planID: $0.id) }
+    }
+
+    public func reviewQueue() throws -> [ReviewWorkItem] {
+        try locked {
+            var items: [ReviewWorkItem] = []
+            var executionIDs: [String] = []
+            try connection.query(
+                """
+                SELECT e.id FROM executions e
+                WHERE e.review_required = 1
+                  AND NOT EXISTS (
+                    SELECT 1 FROM reviews r
+                    WHERE r.execution_id = e.id AND r.completed_at IS NOT NULL
+                  );
+                """
+            ) { statement in
+                if let id = columnText(statement, 0) { executionIDs.append(id) }
+            }
+            for id in executionIDs {
+                var execution: ExecutionRecord?
+                try connection.query(
+                    "SELECT \(executionColumns) FROM executions WHERE id = ?;",
+                    bindings: [.text(id)]
+                ) { statement in
+                    execution = try readExecution(statement)
+                }
+                guard let execution else { continue }
+                let plan: TradePlan?
+                if let planID = execution.planID {
+                    plan = try planLocked(id: planID)
+                } else {
+                    plan = nil
+                }
+                items.append(ReviewWorkItem(
+                    kind: plan?.planType == .exit ? "exit" : "entry",
+                    targetID: execution.id,
+                    symbol: plan?.symbol.normalized ?? "",
+                    application: plan?.application ?? .ibkr,
+                    plan: plan,
+                    execution: execution
+                ))
+            }
+            var overrides: [(String, String, String)] = []
+            try connection.query(
+                """
+                SELECT id, application, normalized_symbol FROM emergency_overrides o
+                WHERE o.review_required = 1
+                  AND NOT EXISTS (
+                    SELECT 1 FROM reviews r
+                    WHERE r.emergency_override_id = o.id AND r.completed_at IS NOT NULL
+                  );
+                """
+            ) { statement in
+                overrides.append((
+                    columnText(statement, 0) ?? "",
+                    columnText(statement, 1) ?? "",
+                    columnText(statement, 2) ?? ""
+                ))
+            }
+            for override in overrides {
+                items.append(ReviewWorkItem(
+                    kind: "emergency",
+                    targetID: override.0,
+                    symbol: override.2,
+                    application: TradingApplication(rawValue: override.1) ?? .ibkr,
+                    plan: nil,
+                    execution: nil
+                ))
+            }
+            return items
+        }
     }
 
     private func executionPlanID(_ executionID: String?) throws -> String? {

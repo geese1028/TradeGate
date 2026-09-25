@@ -60,6 +60,20 @@ final class AppModel: ObservableObject {
     @Published var emergencyArmedAt: Date?
     @Published var emergencyWhy = ""
     @Published var emergencyNext = ""
+    @Published var emergencyDidTrade = false
+    @Published var emergencyChangedPosition = false
+    @Published var emergencyCouldNormal = false
+    @Published var reviewWork: [ReviewWorkItem] = []
+    @Published var actualTimeframe = PlanTimeframe.threeDay
+    @Published var actualMajor = MajorPullback.twoLeg
+    @Published var actualMedium = MediumPullback.oneLeg
+    @Published var actualDivergence = SmallDivergenceTimeframe.m15
+    @Published var actualSignal = SignalTimeframe.m30
+    @Published var actualStop = ""
+    @Published var actualPosition = ""
+    @Published var actualExitState = ExitSecondaryState.oneLegUp
+    @Published var actualExitStrategy = ExitStrategy.fullExitOnBreak
+    @Published var actualExitPrice = ""
     @Published var draft = TradePlan(application: .ibkr, symbol: Symbol(raw: ""), planType: .entry, entry: EntryPlanFields())
     private let inProcess: (coordinator: GateCoordinator, database: TradeGateDatabase)?
     private var lastState: GateState?
@@ -127,7 +141,29 @@ final class AppModel: ObservableObject {
         if let value = decodeEnvelope(DashboardStats.self, from: await call("dashboard")) { dashboard = value }
         if let value = decodeEnvelope([String].self, from: await call("recentSymbols")) { recentSymbols = value }
         if let value = decodeEnvelope(TradeGateSettings.self, from: await call("settings")) { settings = value }
+        if let value = decodeEnvelope([ReviewWorkItem].self, from: await call("reviewQueue")) { reviewWork = value }
         return reply
+    }
+
+    func seedReview(_ item: ReviewWorkItem) {
+        if let entry = item.plan?.entry {
+            actualTimeframe = entry.timeframe ?? .threeDay
+            actualMajor = entry.majorPullback ?? .twoLeg
+            actualMedium = entry.mediumPullback ?? .oneLeg
+            actualDivergence = entry.smallDivergence ?? .m15
+            actualSignal = entry.signalTimeframe ?? .m30
+            actualStop = entry.stopPrice?.storage ?? ""
+            actualPosition = entry.positionValue?.storage ?? ""
+        }
+        if let exit = item.plan?.exit {
+            actualTimeframe = exit.timeframe ?? .threeDay
+            actualExitState = exit.secondaryState ?? .oneLegUp
+            actualExitStrategy = exit.exitStrategy ?? .fullExitOnBreak
+            actualExitPrice = exit.plannedExitPrice?.storage ?? ""
+        }
+        if let price = item.execution?.executionPrice.storage {
+            fillPrice = price
+        }
     }
 
     private func call(_ action: String, _ payload: String = "") async -> String {
@@ -189,6 +225,8 @@ enum GateRoute {
     case entryReview
     case emergency
     case emergencyReview
+    case exitReview
+    case dashboard
     case journal
     case audit
     case settings

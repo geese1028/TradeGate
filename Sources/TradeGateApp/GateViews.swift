@@ -23,6 +23,7 @@ struct MenuBarMenu: View {
         Button("待复盘") { model.route = .reviewRequired; openWindow(id: "gate") }
         Button("Journal") { model.route = .journal; openWindow(id: "gate") }
         Button("Audit") { model.route = .audit; openWindow(id: "gate") }
+        Button("统计") { model.route = .dashboard; openWindow(id: "gate") }
         Divider()
         Button("Emergency Override") { model.route = .emergency; openWindow(id: "gate") }
         Button("Settings") { model.route = .settings; openWindow(id: "gate") }
@@ -49,6 +50,8 @@ struct GateRootView: View {
             case .entryReview: EntryReviewView(model: model)
             case .emergency: EmergencyView(model: model)
             case .emergencyReview: EmergencyReviewView(model: model)
+            case .exitReview: ExitReviewView(model: model)
+            case .dashboard: DashboardView(model: model)
             case .journal: JournalView(model: model)
             case .audit: AuditView(model: model)
             case .settings: SettingsView(model: model)
@@ -96,9 +99,22 @@ struct ReviewRequiredView: View {
     var body: some View {
         VStack(spacing: 12) {
             Text("REVIEW REQUIRED").font(.title2)
+            if let item = model.reviewWork.first {
+                Text("\(item.application.rawValue.uppercased()) / \(item.symbol)")
+                Text(item.kind == "emergency" ? "紧急解锁" : (item.kind == "exit" ? "出场" : "入场"))
+            }
             Text("在完成复盘之前")
             Text("无法正常解锁 YubiKey")
-            Button("开始复盘") { model.route = .entryReview }
+            Button("开始复盘") {
+                guard let item = model.reviewWork.first else { return }
+                model.seedReview(item)
+                switch item.kind {
+                case "emergency": model.route = .emergencyReview
+                case "exit": model.route = .exitReview
+                default: model.route = .entryReview
+                }
+            }
+            .task { await model.perform("reviewQueue") }
             Button("Emergency Override →") { model.route = .emergency }
         }
     }
@@ -359,37 +375,137 @@ struct ExecutionPromptView: View {
 struct EntryReviewView: View {
     @ObservedObject var model: AppModel
     var body: some View {
+        let plan = model.reviewWork.first?.plan?.entry
         Form {
             Text("计划 vs 实际")
+            Text("运行级别 \(plan?.timeframe?.rawValue ?? "-")")
+            Picker("实际运行级别", selection: $model.actualTimeframe) {
+                ForEach(PlanTimeframe.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            }
+            Text("运行级回调 \(plan?.majorPullback?.rawValue ?? "-")")
+            Picker("实际运行级回调", selection: $model.actualMajor) {
+                Text("一段").tag(MajorPullback.oneLeg)
+                Text("两段").tag(MajorPullback.twoLeg)
+                Text("横盘").tag(MajorPullback.sideways)
+            }
+            Text("中周期 \(plan?.mediumPullback?.rawValue ?? "-")")
+            Picker("实际中周期", selection: $model.actualMedium) {
+                Text("一段").tag(MediumPullback.oneLeg)
+                Text("两段").tag(MediumPullback.twoLeg)
+                Text("不明确").tag(MediumPullback.unclear)
+            }
+            Text("底背离 \(plan?.smallDivergence?.rawValue ?? "-")")
+            Picker("实际底背离", selection: $model.actualDivergence) {
+                Text("5m").tag(SmallDivergenceTimeframe.m5)
+                Text("15m").tag(SmallDivergenceTimeframe.m15)
+                Text("30m").tag(SmallDivergenceTimeframe.m30)
+                Text("1H").tag(SmallDivergenceTimeframe.h1)
+                Text("2H").tag(SmallDivergenceTimeframe.h2)
+                Text("4H").tag(SmallDivergenceTimeframe.h4)
+            }
+            Text("信号级别 \(plan?.signalTimeframe?.rawValue ?? "-")")
+            Picker("实际信号级别", selection: $model.actualSignal) {
+                Text("5m").tag(SignalTimeframe.m5)
+                Text("30m").tag(SignalTimeframe.m30)
+                Text("1H").tag(SignalTimeframe.h1)
+            }
+            Text("止损 \(plan?.stopPrice?.storage ?? "-")")
+            TextField("实际止损", text: $model.actualStop)
+            Text("仓位 \(plan?.positionValue?.storage ?? "-")")
+            TextField("实际仓位", text: $model.actualPosition)
+            Text("成交价格")
+            TextField("成交价格", text: $model.fillPrice)
             Picker("是否按照计划执行？", selection: $model.adherence) {
                 Text("完全执行").tag(PlanAdherence.exact)
                 Text("有偏差").tag(PlanAdherence.deviation)
                 Text("明显偏离计划").tag(PlanAdherence.significantDeviation)
             }
             if model.adherence != .exact { TextField("偏离原因", text: $model.deviationReason) }
-            Button("完成复盘") {
-                Task {
-                    let pendingReply = await model.perform("pendingReviews")
-                    guard let pending = decodeEnvelope(PendingReviews.self, from: pendingReply),
-                          let execution = pending.executions.last(where: \.reviewRequired) else { return }
-                    let started = await model.perform("startReview", payload: #"{"id":"\#(execution.id)"}"#)
-                    guard let review = decodeEnvelope(ReviewRecord.self, from: started) else { return }
-                    guard let stop = try? DecimalValue(parsing: "1"),
-                          let size = try? DecimalValue(parsing: "20") else { return }
-                    let actuals = EntryReviewActuals(
-                        timeframe: .threeDay, majorPullback: .twoLeg, mediumPullback: .oneLeg,
-                        smallDivergence: .m15, signalStatus: .appeared, signalTimeframe: .m30,
-                        stopPrice: stop, positionMode: .percent,
-                        positionValue: size,
-                        executionPrice: execution.executionPrice, adherence: model.adherence, deviationReason: model.deviationReason
-                    )
-                    let payload = EntryReviewPayload(reviewID: review.id, actuals: actuals)
-                    await model.perform("completeEntryReview", payload: (try? json(payload)) ?? "")
-                    model.route = .home
-                }
-            }
+            Button("完成复盘") { Task { await finishEntryReview(model) } }
         }
     }
+}
+
+@MainActor
+private func finishEntryReview(_ model: AppModel) async {
+    guard let item = model.reviewWork.first(where: { $0.kind == "entry" }),
+          let stop = try? DecimalValue(parsing: model.actualStop),
+          let size = try? DecimalValue(parsing: model.actualPosition),
+          let fill = try? DecimalValue(parsing: model.fillPrice) else { return }
+    let started = await model.perform("startReview", payload: #"{"id":"\#(item.targetID)"}"#)
+    guard let review = decodeEnvelope(ReviewRecord.self, from: started) else { return }
+    let actuals = EntryReviewActuals(
+        timeframe: model.actualTimeframe,
+        majorPullback: model.actualMajor,
+        mediumPullback: model.actualMedium,
+        smallDivergence: model.actualDivergence,
+        signalStatus: .appeared,
+        signalTimeframe: model.actualSignal,
+        stopPrice: stop,
+        positionMode: item.plan?.entry?.positionMode ?? .percent,
+        positionValue: size,
+        executionPrice: fill,
+        adherence: model.adherence,
+        deviationReason: model.deviationReason
+    )
+    await model.perform("completeEntryReview", payload: (try? json(EntryReviewPayload(reviewID: review.id, actuals: actuals))) ?? "")
+    model.route = .home
+}
+
+struct ExitReviewView: View {
+    @ObservedObject var model: AppModel
+    var body: some View {
+        let plan = model.reviewWork.first?.plan?.exit
+        Form {
+            Text("计划 vs 实际")
+            Text("运行级别 \(plan?.timeframe?.rawValue ?? "-")")
+            Picker("实际运行级别", selection: $model.actualTimeframe) {
+                ForEach(PlanTimeframe.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            }
+            Text("次级运行状态 \(plan?.secondaryState?.rawValue ?? "-")")
+            Picker("实际次级状态", selection: $model.actualExitState) {
+                Text("一段上涨").tag(ExitSecondaryState.oneLegUp)
+                Text("两段上涨").tag(ExitSecondaryState.twoLegUp)
+                Text("顶背离").tag(ExitSecondaryState.topDivergence)
+                Text("不明确").tag(ExitSecondaryState.unclear)
+            }
+            Text("离场策略 \(plan?.exitStrategy?.rawValue ?? "-")")
+            Picker("实际离场策略", selection: $model.actualExitStrategy) {
+                Text("全部离场").tag(ExitStrategy.fullExitOnBreak)
+                Text("减仓等待").tag(ExitStrategy.reduceAndWait)
+                Text("自定义").tag(ExitStrategy.custom)
+            }
+            Text("离场价格 \(plan?.plannedExitPrice?.storage ?? "-")")
+            TextField("实际离场价格", text: $model.actualExitPrice)
+            Text("离场仓位 \(plan?.exitPositionMode?.rawValue ?? "ALL")")
+            Picker("是否按计划执行", selection: $model.adherence) {
+                Text("完全执行").tag(PlanAdherence.exact)
+                Text("有偏差").tag(PlanAdherence.deviation)
+                Text("明显偏离计划").tag(PlanAdherence.significantDeviation)
+            }
+            if model.adherence != .exact { TextField("偏离原因", text: $model.deviationReason) }
+            Button("完成出场复盘") { Task { await finishExitReview(model) } }
+        }
+    }
+}
+
+@MainActor
+private func finishExitReview(_ model: AppModel) async {
+    guard let item = model.reviewWork.first(where: { $0.kind == "exit" }),
+          let price = try? DecimalValue(parsing: model.actualExitPrice) else { return }
+    let started = await model.perform("startReview", payload: #"{"id":"\#(item.targetID)"}"#)
+    guard let review = decodeEnvelope(ReviewRecord.self, from: started) else { return }
+    let actuals = ExitReviewActuals(
+        timeframe: model.actualTimeframe,
+        secondaryState: model.actualExitState,
+        exitStrategy: model.actualExitStrategy,
+        plannedExitPrice: price,
+        exitPositionMode: item.plan?.exit?.exitPositionMode ?? .all,
+        adherence: model.adherence,
+        deviationReason: model.deviationReason
+    )
+    await model.perform("completeExitReview", payload: (try? json(ExitReviewPayload(reviewID: review.id, actuals: actuals))) ?? "")
+    model.route = .home
 }
 
 struct EmergencyView: View {
@@ -411,7 +527,7 @@ struct EmergencyView: View {
             if model.emergencyArmedAt == nil {
                 Button("开始 20 秒倒计时") { model.emergencyArmedAt = Date() }
                     .disabled(model.emergencyReason.trimmingCharacters(in: .whitespaces).count < 10 || model.emergencyPhrase != "EMERGENCY UNLOCK")
-            } else if Date().timeIntervalSince(model.emergencyArmedAt ?? Date()) < 20 {
+            } else if Date().timeIntervalSince(model.emergencyArmedAt ?? Date()) < TimeInterval(model.settings.emergencyCountdownSeconds) {
                 Text("请等待倒计时")
             } else {
                 Button("确认紧急解锁") {
@@ -436,12 +552,50 @@ struct EmergencyReviewView: View {
     var body: some View {
         Form {
             TextField("为什么使用 Emergency Override？", text: $model.emergencyWhy)
+            Toggle("是否发生交易？", isOn: $model.emergencyDidTrade)
+            Toggle("是否改变仓位？", isOn: $model.emergencyChangedPosition)
+            Toggle("本次是否本可通过正常流程完成？", isOn: $model.emergencyCouldNormal)
             TextField("下次如何避免？", text: $model.emergencyNext)
-            Button("完成紧急复盘") {
-                Task { model.route = .home }
-            }
-            .disabled(model.emergencyWhy.isEmpty || model.emergencyNext.isEmpty)
+            Button("完成紧急复盘") { Task { await finishEmergencyReview(model) } }
+            .disabled(model.emergencyWhy.trimmingCharacters(in: .whitespaces).isEmpty || model.emergencyNext.trimmingCharacters(in: .whitespaces).isEmpty)
         }
+    }
+}
+
+@MainActor
+private func finishEmergencyReview(_ model: AppModel) async {
+    guard let item = model.reviewWork.first(where: { $0.kind == "emergency" }) else { return }
+    let started = await model.perform("startEmergencyReview", payload: #"{"id":"\#(item.targetID)"}"#)
+    guard let review = decodeEnvelope(ReviewRecord.self, from: started) else { return }
+    let answers = EmergencyReviewAnswers(
+        why: model.emergencyWhy,
+        didTrade: model.emergencyDidTrade,
+        changedPosition: model.emergencyChangedPosition,
+        couldHaveUsedNormalFlow: model.emergencyCouldNormal,
+        howToAvoidNextTime: model.emergencyNext
+    )
+    await model.perform(
+        "completeEmergencyReview",
+        payload: (try? json(EmergencyReviewPayload(reviewID: review.id, answers: answers))) ?? ""
+    )
+    model.route = .home
+}
+
+struct DashboardView: View {
+    @ObservedObject var model: AppModel
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("过去30天").font(.title3)
+            Text("Unlock 次数 \(model.dashboard.unlockCount)")
+            Text("Emergency Override 次数 \(model.dashboard.emergencyCount)")
+            Text("交易次数 \(model.dashboard.tradeCount)")
+            Text("无成交 Unlock 次数 \(model.dashboard.noExecutionUnlockCount)")
+            Text(String(format: "计划执行率 %.0f%%", model.dashboard.adherenceRate * 100))
+            Text("仓位偏离次数 \(model.dashboard.positionDeviationCount)")
+            Text("止损偏离次数 \(model.dashboard.stopDeviationCount)")
+            Text("提前进场次数 \(model.dashboard.earlyEntryCount)")
+        }
+        .task { await model.perform("dashboard") }
     }
 }
 

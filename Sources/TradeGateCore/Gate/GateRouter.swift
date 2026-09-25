@@ -93,6 +93,8 @@ public enum GateRouter {
             return try json(database.completeEmergencyReview(reviewID: body.reviewID, answers: body.answers))
         case "pendingReviews":
             return try json(PendingReviews(count: database.pendingReviewCount(), executions: database.executions(planID: nil)))
+        case "reviewQueue":
+            return try json(database.reviewQueue())
         case "export":
             return try json(database.exportDocument())
         case "backup":
