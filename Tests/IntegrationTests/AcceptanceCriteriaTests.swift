@@ -10,6 +10,20 @@ import Testing
     #expect(try await !(harness.mock.getState(deviceID: "111").fidoAvailable))
 }
 
+@Test func registeredSerialSurvivesANewDaemon() async throws {
+    let harness = try AcceptanceHarness()
+    await harness.coordinator.boot()
+    try await harness.coordinator.registerDevice(serial: "111")
+    let other = MockYubiKeyController(devices: [
+        MockYubiKeyController.SimulatedDevice(serialNumber: "222", fido2Enabled: true, u2fEnabled: true),
+    ])
+    let restarted = GateCoordinator(database: harness.database, yubiKey: other)
+    await restarted.boot()
+    let snapshot = await restarted.snapshot()
+    #expect(snapshot.managedSerial == "111")
+    #expect(try await other.getState(deviceID: "222").fidoAvailable)
+}
+
 @Test func ac02ManagedSerialNotEveryInsertedKey() async throws {
     let harness = try AcceptanceHarness()
     await harness.coordinator.boot()

@@ -699,6 +699,7 @@ struct JournalView: View {
                 model.route = .tradeDetail
             } label: {
                 VStack(alignment: .leading) {
+                    Text(entry.plan.createdAt.formatted(date: .numeric, time: .omitted))
                     Text(entry.plan.symbol.normalized)
                     Text(entry.plan.application.rawValue.uppercased())
                     Text(entry.plan.planType == .entry ? "ENTRY PLAN" : "EXIT PLAN")
@@ -775,6 +776,7 @@ struct SettingsView: View {
     @ObservedObject var model: AppModel
     var body: some View {
         Form {
+            Text("Managed YubiKey \(model.snapshot.managedSerial ?? "未登记")")
             Picker("Unlock duration", selection: $model.settings.unlockDurationSeconds) {
                 ForEach(UnlockDuration.allCases, id: \.rawValue) { Text("\($0.rawValue) sec").tag($0.rawValue) }
             }

@@ -13,7 +13,7 @@ swift run TradeGateApp --in-process
 
 The daemon polls once a second and relocks FIDO when the unlock window ends, even if the menu bar app is closed.
 
-`Scripts/package.sh` builds a `dist/TradeGate.app` bundle with the daemon plist. Real key tests:
+`Scripts/package.sh` builds a `dist/TradeGate.app` bundle with the daemon plist. The CLI is `Contents/Helpers/tradegate`, because a case-insensitive disk treats `tradegate` and `TradeGate` as the same file inside `Contents/MacOS`. Real key tests:
 
 ```sh
 TRADEGATE_HARDWARE_TEST=1 ./Scripts/test.sh

@@ -27,13 +27,13 @@ public actor YkmanCLIController: YubiKeyControlling {
     }
 
     public func lock(deviceID: String) async throws {
-        try run(.setUSB(serial: deviceID, application: .fido2, enabled: false))
-        try run(.setUSB(serial: deviceID, application: .u2f, enabled: false))
+        _ = try run(.setUSB(serial: deviceID, application: .fido2, enabled: false))
+        _ = try run(.setUSB(serial: deviceID, application: .u2f, enabled: false))
     }
 
     public func unlock(deviceID: String) async throws {
-        try run(.setUSB(serial: deviceID, application: .fido2, enabled: true))
-        try run(.setUSB(serial: deviceID, application: .u2f, enabled: true))
+        _ = try run(.setUSB(serial: deviceID, application: .fido2, enabled: true))
+        _ = try run(.setUSB(serial: deviceID, application: .u2f, enabled: true))
     }
 
     public func ykmanVersion() async throws -> YkmanVersion {

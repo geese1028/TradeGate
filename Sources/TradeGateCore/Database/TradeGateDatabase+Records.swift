@@ -53,6 +53,23 @@ public extension TradeGateDatabase {
         }
     }
 
+    func enabledManagedSerial() throws -> String? {
+        try locked {
+            var serial: String?
+            try connection.query(
+                """
+                SELECT serial_number FROM managed_devices
+                WHERE enabled = 1
+                ORDER BY last_seen_at DESC
+                LIMIT 1;
+                """
+            ) { statement in
+                serial = columnText(statement, 0)
+            }
+            return serial
+        }
+    }
+
     func device(serialNumber: String) throws -> ManagedDevice? {
         try locked {
             var found: ManagedDevice?

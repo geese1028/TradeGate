@@ -13,6 +13,7 @@ public struct GateSnapshot: Equatable, Sendable, Codable {
     public var activePlanID: String?
     public var needsExecutionPrompt: Bool
     public var onboardingComplete: Bool
+    public var managedSerial: String?
 
     public init(
         state: GateState,
@@ -26,7 +27,8 @@ public struct GateSnapshot: Equatable, Sendable, Codable {
         warning: String? = nil,
         activePlanID: String? = nil,
         needsExecutionPrompt: Bool = false,
-        onboardingComplete: Bool = false
+        onboardingComplete: Bool = false,
+        managedSerial: String? = nil
     ) {
         self.state = state
         self.pendingReviewCount = pendingReviewCount
@@ -40,6 +42,7 @@ public struct GateSnapshot: Equatable, Sendable, Codable {
         self.activePlanID = activePlanID
         self.needsExecutionPrompt = needsExecutionPrompt
         self.onboardingComplete = onboardingComplete
+        self.managedSerial = managedSerial
     }
 }
 
@@ -87,7 +90,8 @@ public actor GateCoordinator {
             warning: warning,
             activePlanID: activePlanID,
             needsExecutionPrompt: needsExecutionPrompt,
-            onboardingComplete: (try? database.flag("onboarding_completed")) == "1"
+            onboardingComplete: (try? database.flag("onboarding_completed")) == "1",
+            managedSerial: managedSerial
         )
     }
 
@@ -243,7 +247,7 @@ public actor GateCoordinator {
     ) async throws {
         guard let serial = try await managedDeviceID() else {
             try transition(.unlockFailed)
-            try await finishLock(confirmedFailure: true)
+            await finishLock(confirmedFailure: true)
             throw YubiKeyControlError.absent
         }
         do {
@@ -277,7 +281,7 @@ public actor GateCoordinator {
             ))
         } catch {
             try? transition(.unlockFailed)
-            try? await finishLock(confirmedFailure: true)
+            await finishLock(confirmedFailure: true)
             let event: AuditEventType = switch error {
             case YubiKeyControlError.forbiddenCommand, YubiKeyControlError.untrustedExecutable, YubiKeyControlError.unsupportedYkmanVersion:
                 .helperError
@@ -305,6 +309,9 @@ public actor GateCoordinator {
             return
         }
         let devices = await (try? yubiKey.listDevices()) ?? []
+        if managedSerial == nil {
+            managedSerial = try? database.enabledManagedSerial()
+        }
         if managedSerial == nil {
             managedSerial = devices.first(where: \.isManageable)?.serialNumber
         }
