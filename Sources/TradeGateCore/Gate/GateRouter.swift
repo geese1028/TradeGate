@@ -11,6 +11,9 @@ public enum GateRouter {
             let result = try await handle(coordinator: coordinator, database: database, action: action, payload: payload)
             return #"{"ok":true,"result":\#(result)}"#
         } catch {
+            if case TradeGateError.sqlite = error {
+                _ = try? database.appendAudit(AuditEventDraft(eventType: .databaseError, metadata: ["message": "\(error)"]))
+            }
             let message = String(describing: error)
                 .replacingOccurrences(of: "\\", with: "\\\\")
                 .replacingOccurrences(of: "\"", with: "\\\"")

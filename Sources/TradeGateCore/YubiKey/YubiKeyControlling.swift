@@ -107,11 +107,16 @@ public actor MockYubiKeyController: YubiKeyControlling {
     }
 
     private var devices: [String: SimulatedDevice]
+    private var scriptedError: YubiKeyControlError?
     public private(set) var lockCount = 0
     public private(set) var unlockCount = 0
 
     public init(devices: [SimulatedDevice] = [SimulatedDevice()]) {
         self.devices = Dictionary(uniqueKeysWithValues: devices.map { ($0.serialNumber, $0) })
+    }
+
+    public func scriptNextFailure(_ error: YubiKeyControlError) {
+        scriptedError = error
     }
 
     public func apply(_ scenario: MockYubiKeyScenario, serialNumber: String = "12345678") {
@@ -165,6 +170,10 @@ public actor MockYubiKeyController: YubiKeyControlling {
     }
 
     public func lock(deviceID: String) async throws {
+        if let scriptedError {
+            self.scriptedError = nil
+            throw scriptedError
+        }
         guard var device = devices[deviceID] else {
             throw YubiKeyControlError.absent
         }
@@ -182,6 +191,10 @@ public actor MockYubiKeyController: YubiKeyControlling {
     }
 
     public func unlock(deviceID: String) async throws {
+        if let scriptedError {
+            self.scriptedError = nil
+            throw scriptedError
+        }
         guard var device = devices[deviceID] else {
             throw YubiKeyControlError.absent
         }

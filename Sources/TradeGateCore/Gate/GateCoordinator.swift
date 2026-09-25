@@ -123,6 +123,13 @@ public actor GateCoordinator {
             ))
             throw denial
         }
+        _ = try database.appendAudit(AuditEventDraft(
+            eventType: .planSubmitted,
+            application: plan.application,
+            symbol: plan.symbol.normalized,
+            planID: plan.id,
+            timestamp: now
+        ))
         plan = try database.approvePlan(id: plan.id)
         try transition(.requestNormalUnlock)
         _ = try database.appendAudit(AuditEventDraft(
@@ -267,7 +274,13 @@ public actor GateCoordinator {
         } catch {
             try? transition(.unlockFailed)
             try? await finishLock(confirmedFailure: true)
-            _ = try? database.appendAudit(AuditEventDraft(eventType: .yubiKeyError, metadata: ["message": "\(error)"]))
+            let event: AuditEventType = switch error {
+            case YubiKeyControlError.forbiddenCommand, YubiKeyControlError.untrustedExecutable, YubiKeyControlError.unsupportedYkmanVersion:
+                .helperError
+            default:
+                .yubiKeyError
+            }
+            _ = try? database.appendAudit(AuditEventDraft(eventType: event, metadata: ["message": "\(error)"]))
             throw error
         }
     }

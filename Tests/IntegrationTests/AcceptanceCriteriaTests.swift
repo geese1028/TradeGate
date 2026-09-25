@@ -110,7 +110,7 @@ import Testing
     let types = try Set(harness.database.auditEvents().map(\.eventType))
     for required in [
         AuditEventType.planCreated, .planApproved, .unlockRequested, .unlockApproved,
-        .yubiKeyUnlocked, .yubiKeyLocked, .executionConfirmed, .reviewRequired,
+        .yubiKeyUnlocked, .yubiKeyLocked, .executionConfirmed, .reviewRequired, .planSubmitted,
         .reviewStarted, .reviewCompleted,
     ] {
         #expect(types.contains(required))
@@ -158,6 +158,19 @@ import Testing
     ] {
         #expect(types.contains(required))
     }
+}
+
+@Test func helperFailureIsAuditedSeparatelyFromKeyFailure() async throws {
+    let harness = try AcceptanceHarness()
+    await harness.coordinator.boot()
+    let plan = try await harness.coordinator.createPlan(entryPlan())
+    await harness.mock.scriptNextFailure(.forbiddenCommand("reset"))
+    do {
+        try await harness.coordinator.approveAndUnlock(planID: plan.id)
+    } catch is YubiKeyControlError {}
+    let types = try harness.database.auditEvents().map(\.eventType)
+    #expect(types.contains(.helperError))
+    #expect(types.contains(.planSubmitted))
 }
 
 @Test func ac16SourcesDoNotUseNetwork() throws {
