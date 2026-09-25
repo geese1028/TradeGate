@@ -181,6 +181,11 @@ public actor GateCoordinator {
         return plan
     }
 
+    public func dismissExecutionPrompt() async {
+        needsExecutionPrompt = false
+        try? evaluateAndStore()
+    }
+
     public func confirmExecution(_ input: ExecutionInput) async throws -> ExecutionRecord {
         let record = try database.confirmExecution(input)
         needsExecutionPrompt = false

@@ -122,6 +122,30 @@ import Testing
     }
 }
 
+@Test func emergencyUnlockWithoutAPlanCanLeaveTheExecutionQuestion() async throws {
+    let harness = try AcceptanceHarness()
+    await harness.coordinator.boot()
+    let opened = Date()
+    _ = try await harness.coordinator.emergencyUnlock(
+        EmergencyOverrideInput(
+            application: .ibkr,
+            symbol: Symbol(raw: "NVDA"),
+            reasonCategory: .positionRisk,
+            reasonText: "need to cut risk",
+            confirmationPhrase: "EMERGENCY UNLOCK"
+        ),
+        now: opened
+    )
+    await harness.coordinator.expireUnlockWindow(at: opened.addingTimeInterval(120))
+    let asking = await harness.coordinator.snapshot()
+    #expect(asking.needsExecutionPrompt)
+    #expect(asking.activePlanID == nil)
+    await harness.coordinator.dismissExecutionPrompt()
+    let after = await harness.coordinator.snapshot()
+    #expect(!after.needsExecutionPrompt)
+    #expect(after.pendingReviewCount == 1)
+}
+
 @Test func ac11And12EmergencyLeavesAuditAndReview() async throws {
     let harness = try AcceptanceHarness()
     await harness.coordinator.boot()

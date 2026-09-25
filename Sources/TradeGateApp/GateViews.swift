@@ -552,24 +552,32 @@ struct ExecutionPromptView: View {
                 if !model.traded {
                     Button("没有交易") {
                         Task {
-                            let id = model.snapshot.activePlanID ?? model.draft.id
-                            let reply = await model.perform("noTrade", payload: #"{"id":"\#(id)","disposition":"NO_EXECUTION"}"#)
-                            if reply.contains("\"ok\":true") {
-                                model.route = .home
+                            if let id = model.snapshot.activePlanID {
+                                let reply = await model.perform("noTrade", payload: #"{"id":"\#(id)","disposition":"NO_EXECUTION"}"#)
+                                if reply.contains("\"ok\":true") {
+                                    model.route = .home
+                                }
+                            } else {
+                                let reply = await model.perform("dismissExecution")
+                                if reply.contains("\"ok\":true") {
+                                    model.route = .home
+                                }
                             }
                         }
                     }
                     .aquaSecondary(fills: true)
-                    Button("取消这次计划") {
-                        Task {
-                            let id = model.snapshot.activePlanID ?? model.draft.id
-                            let reply = await model.perform("noTrade", payload: #"{"id":"\#(id)","disposition":"CANCELLED"}"#)
-                            if reply.contains("\"ok\":true") {
-                                model.route = .home
+                    if model.snapshot.activePlanID != nil {
+                        Button("取消这次计划") {
+                            Task {
+                                let id = model.snapshot.activePlanID ?? ""
+                                let reply = await model.perform("noTrade", payload: #"{"id":"\#(id)","disposition":"CANCELLED"}"#)
+                                if reply.contains("\"ok\":true") {
+                                    model.route = .home
+                                }
                             }
                         }
+                        .aquaSecondary(fills: true)
                     }
-                    .aquaSecondary(fills: true)
                     Button("已成交") { model.beginExecutionReport() }
                         .aquaPrimary(fills: true)
                 } else {

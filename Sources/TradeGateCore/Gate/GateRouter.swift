@@ -43,6 +43,9 @@ public enum GateRouter {
         case "noTrade":
             let body = try decode(NoTradePayload.self, from: data)
             return try await json(coordinator.recordNoTrade(planID: body.id, disposition: body.disposition))
+        case "dismissExecution":
+            await coordinator.dismissExecutionPrompt()
+            return try await json(coordinator.snapshot())
         case "execution":
             return try await json(coordinator.confirmExecution(decode(ExecutionInput.self, from: data)))
         case "emergency":
