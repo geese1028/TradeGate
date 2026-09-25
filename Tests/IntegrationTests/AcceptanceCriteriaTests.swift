@@ -190,6 +190,25 @@ import Testing
     #expect(!(try await harness.mock.getState(deviceID: "111").fidoAvailable))
 }
 
+@Test func unlockWindowUsesTheSavedDuration() async throws {
+    let harness = try AcceptanceHarness()
+    var settings = try harness.database.settings()
+    settings.unlockDurationSeconds = 10
+    #expect(throws: TradeGateError.self) {
+        try harness.database.updateSettings(settings)
+    }
+    settings.unlockDurationSeconds = 30
+    try harness.database.updateSettings(settings)
+    await harness.coordinator.boot()
+    let plan = try await harness.coordinator.createPlan(entryPlan())
+    let start = Date(timeIntervalSince1970: 8_000)
+    try await harness.coordinator.approveAndUnlock(planID: plan.id, now: start)
+    _ = await harness.coordinator.snapshot(now: start.addingTimeInterval(29))
+    #expect(await harness.coordinator.currentState() == .unlocked)
+    _ = await harness.coordinator.snapshot(now: start.addingTimeInterval(30))
+    #expect(!(try await harness.mock.getState(deviceID: "111").fidoAvailable))
+}
+
 @Test func signalAppearedUpdatesTheSavedPlan() async throws {
     let harness = try AcceptanceHarness()
     await harness.coordinator.boot()
