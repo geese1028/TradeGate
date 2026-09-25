@@ -90,10 +90,17 @@ public enum YkmanTextParser {
                 serialNumber: serial,
                 productName: product,
                 firmwareVersion: firmware,
-                fido2Controllable: text.uppercased().contains("FIDO"),
-                u2fControllable: text.uppercased().contains("FIDO")
+                fido2Controllable: false,
+                u2fControllable: false
             )
         }
+    }
+
+    public static func controllableApplications(from infoOutput: String) -> (fido2: Bool, u2f: Bool) {
+        (
+            fido2: applicationListed("FIDO2", in: infoOutput),
+            u2f: applicationListed("FIDO U2F", in: infoOutput) || applicationListed("U2F", in: infoOutput)
+        )
     }
 
     public static func state(from infoOutput: String) -> YubiKeyState {
@@ -102,6 +109,24 @@ public enum YkmanTextParser {
             fido2Enabled: applicationEnabled("FIDO2", in: infoOutput),
             u2fEnabled: applicationEnabled("FIDO U2F", in: infoOutput) || applicationEnabled("U2F", in: infoOutput)
         )
+    }
+
+    private static func applicationListed(_ name: String, in output: String) -> Bool {
+        let needle = name.uppercased()
+        for line in output.split(separator: "\n") {
+            let text = String(line).trimmingCharacters(in: .whitespacesAndNewlines)
+            let upper = text.uppercased()
+            guard upper.hasPrefix(needle) else { continue }
+            let remainder = upper.dropFirst(needle.count)
+            if let next = remainder.first, !next.isWhitespace {
+                continue
+            }
+            let lowered = text.lowercased()
+            if lowered.contains("disabled") || lowered.contains("enabled") {
+                return true
+            }
+        }
+        return false
     }
 
     private static func applicationEnabled(_ name: String, in output: String) -> Bool {

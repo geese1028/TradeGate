@@ -33,11 +33,60 @@ import Testing
             if arguments.contains("list") {
                 return "YubiKey 5C NFC (5.7.1) [OTP+CCID] Serial: 77\n"
             }
+            if arguments.contains("info") {
+                return ""
+            }
             return ""
         }
     )
     let devices = try await selection.controller.listDevices()
     #expect(devices.isEmpty)
+}
+
+@Test func usbDisabledFIDOApplicationsRemainManageable() async throws {
+    let selection = await YubiKeyBackend.select(
+        environment: [
+            "TRADEGATE_YKMAN": "/tmp/ykman",
+            "TRADEGATE_DEV_YKMAN": "1",
+        ],
+        runner: { _, arguments in
+            if arguments == ["--version"] {
+                return "YubiKey Manager (ykman) version: 5.9.2"
+            }
+            if arguments.contains("list") {
+                return "YubiKey 5C NFC (5.4.3) [OTP+CCID] Serial: 10000001\n"
+            }
+            if arguments.contains("info") {
+                return """
+                Device type: YubiKey 5C NFC
+                Serial number: 10000001
+                Firmware version: 5.4.3
+                Form factor: Keychain (USB-C)
+                Enabled USB interfaces: OTP, CCID
+                NFC transport is enabled
+
+                Applications\tUSB     \tNFC
+                Yubico OTP  \tEnabled \tEnabled
+                FIDO U2F    \tDisabled\tEnabled
+                FIDO2       \tDisabled\tEnabled
+                OATH        \tEnabled \tEnabled
+                PIV         \tEnabled \tEnabled
+                OpenPGP     \tEnabled \tEnabled
+                YubiHSM Auth\tEnabled \tEnabled
+                """
+            }
+            return ""
+        }
+    )
+    let devices = try await selection.controller.listDevices()
+    #expect(devices.count == 1)
+    #expect(devices.first?.serialNumber == "10000001")
+    #expect(devices.first?.isManageable == true)
+    let state = try await selection.controller.getState(deviceID: "10000001")
+    #expect(state.present)
+    #expect(!state.fido2Enabled)
+    #expect(!state.u2fEnabled)
+    #expect(!state.fidoAvailable)
 }
 
 @Test func ykmanSixStaysFailClosed() async throws {
@@ -144,11 +193,14 @@ import Testing
 @Test func ykmanParserReadsListAndInfo() {
     let listed = YkmanTextParser.devices(from: "YubiKey 5C NFC (5.7.1) [OTP+FIDO+CCID] Serial: 99887766\n")
     #expect(listed.first?.serialNumber == "99887766")
-    #expect(listed.first?.isManageable == true)
+    #expect(listed.first?.isManageable == false)
     let info = """
     FIDO U2F        Disabled
     FIDO2           Disabled
     """
+    let applications = YkmanTextParser.controllableApplications(from: info)
+    #expect(applications.fido2)
+    #expect(applications.u2f)
     let state = YkmanTextParser.state(from: info)
     #expect(!state.fido2Enabled)
     #expect(!state.u2fEnabled)

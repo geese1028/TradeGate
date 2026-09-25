@@ -20,7 +20,22 @@ public actor YkmanCLIController: YubiKeyControlling {
 
     public func listDevices() async throws -> [YubiKeyDevice] {
         let output = try run(.list)
-        return YkmanTextParser.devices(from: output).filter(\.isManageable)
+        var manageable: [YubiKeyDevice] = []
+        for device in YkmanTextParser.devices(from: output) {
+            let info = try run(.info(serial: device.serialNumber))
+            let applications = YkmanTextParser.controllableApplications(from: info)
+            guard applications.fido2, applications.u2f else { continue }
+            manageable.append(
+                YubiKeyDevice(
+                    serialNumber: device.serialNumber,
+                    productName: device.productName,
+                    firmwareVersion: device.firmwareVersion,
+                    fido2Controllable: true,
+                    u2fControllable: true
+                )
+            )
+        }
+        return manageable
     }
 
     public func getState(deviceID: String) async throws -> YubiKeyState {
