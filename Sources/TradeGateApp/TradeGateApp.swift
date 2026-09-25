@@ -141,8 +141,10 @@ final class AppModel: ObservableObject {
         }
         lastState = next.state
         snapshot = next
-        if next.state == .reviewRequired {
-            route = route == .home ? .reviewRequired : route
+        if next.needsExecutionPrompt {
+            route = .executionPrompt
+        } else if next.state == .reviewRequired, route == .home {
+            route = .reviewRequired
         }
     }
 
