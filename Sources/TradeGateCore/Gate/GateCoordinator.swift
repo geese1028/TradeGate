@@ -60,7 +60,6 @@ public actor GateCoordinator {
     private var warning: String?
     private var seenDevice = false
     private var lastDevices: [YubiKeyDevice] = []
-    private var lastProbe: Date = .distantPast
 
     public init(database: TradeGateDatabase, yubiKey: any YubiKeyControlling) {
         self.database = database
@@ -313,9 +312,6 @@ public actor GateCoordinator {
             await lockAfterWindow(now: now)
             return
         }
-        let probeInterval: TimeInterval = state == .unlocked ? 2 : 8
-        guard now.timeIntervalSince(lastProbe) >= probeInterval else { return }
-        lastProbe = now
         let devices = await (try? yubiKey.listDevices()) ?? []
         lastDevices = devices
         if managedSerial == nil {

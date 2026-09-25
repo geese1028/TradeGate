@@ -163,6 +163,7 @@ struct ReviewRequiredView: View {
     var body: some View {
         ScreenScroll {
             VStack(spacing: 14) {
+                stepBack("返回首页") { model.route = .home }
                 EmbossedTitle(text: "REVIEW REQUIRED")
                 if let item = model.reviewWork.first {
                     InsetCard {
@@ -190,6 +191,7 @@ struct ReviewRequiredView: View {
                     }
                 }
                 .aquaPrimary(fills: true)
+                .disabled(model.reviewWork.isEmpty)
                 .task { await model.perform("reviewQueue") }
                 Button("Emergency Override →") { model.route = .emergency }
                     .aquaDestructive(fills: true)
@@ -203,6 +205,7 @@ struct ChooseAppView: View {
     var body: some View {
         ScreenScroll {
             VStack(spacing: 16) {
+                stepBack("返回") { model.route = .home }
                 EmbossedTitle(text: "选择交易应用", size: .title3)
                 HStack(spacing: 12) {
                     Button("IBKR\n股票") { model.draft.application = .ibkr; model.route = .symbol }
@@ -219,6 +222,7 @@ struct SymbolView: View {
     var body: some View {
         ScreenScroll {
             VStack(alignment: .leading, spacing: 12) {
+                stepBack("返回") { model.route = .chooseApp }
                 EmbossedTitle(text: "交易标的", size: .title3)
                 InsetCard {
                     TextField("NVDA", text: $model.symbolText)
@@ -252,6 +256,7 @@ struct PlanTypeView: View {
     var body: some View {
         ScreenScroll {
             VStack(spacing: 12) {
+                stepBack("返回") { model.route = .symbol }
                 Button("入场") {
                     model.draft.planType = .entry
                     model.draft.entry = EntryPlanFields()
@@ -279,6 +284,7 @@ struct EntryFormView: View {
 
     var body: some View {
         Form {
+            stepBack("返回") { model.route = .planType }
             Picker("交易周期", selection: binding(\.timeframe, PlanTimeframe.threeDay)) {
                 ForEach(PlanTimeframe.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }
@@ -361,6 +367,7 @@ struct ExitFormView: View {
     @ObservedObject var model: AppModel
     var body: some View {
         Form {
+            stepBack("返回") { model.route = .planType }
             Picker("运行级别", selection: exitBinding(\.timeframe, PlanTimeframe.threeDay)) {
                 ForEach(PlanTimeframe.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }
@@ -433,6 +440,7 @@ struct SignalPendingView: View {
     var body: some View {
         ScreenScroll {
             VStack(alignment: .leading, spacing: 14) {
+                stepBack("返回首页") { model.route = .home }
                 InsetCard {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("✓ 交易计划已保存")
@@ -607,6 +615,7 @@ struct EntryReviewView: View {
     var body: some View {
         let plan = model.reviewWork.first?.plan?.entry
         Form {
+            stepBack("返回") { model.route = .reviewRequired }
             Text("计划 vs 实际")
             Text("运行级别 \(plan?.timeframe?.rawValue ?? "-")")
             Picker("实际运行级别", selection: $model.actualTimeframe) {
@@ -693,6 +702,7 @@ struct ExitReviewView: View {
     var body: some View {
         let plan = model.reviewWork.first?.plan?.exit
         Form {
+            stepBack("返回") { model.route = .reviewRequired }
             Text("计划 vs 实际")
             Text("运行级别 \(plan?.timeframe?.rawValue ?? "-")")
             Picker("实际运行级别", selection: $model.actualTimeframe) {
@@ -765,6 +775,7 @@ struct EmergencyView: View {
     var body: some View {
         ScreenScroll {
             VStack(alignment: .leading, spacing: 12) {
+                stepBack("返回") { model.route = .home }
                 InsetCard {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("⚠ 紧急解锁")
@@ -840,6 +851,7 @@ struct EmergencyReviewView: View {
     @ObservedObject var model: AppModel
     var body: some View {
         Form {
+            stepBack("返回") { model.route = .reviewRequired }
             TextField("为什么使用 Emergency Override？", text: $model.emergencyWhy)
             Toggle("是否发生交易？", isOn: $model.emergencyDidTrade)
             Toggle("是否改变仓位？", isOn: $model.emergencyChangedPosition)
@@ -879,6 +891,7 @@ struct DashboardView: View {
     var body: some View {
         ScreenScroll {
             VStack(alignment: .leading, spacing: 14) {
+                stepBack("返回首页") { model.route = .home }
                 EmbossedTitle(text: "过去30天", size: .title3)
                 InsetCard(padding: 0) {
                     VStack(alignment: .leading, spacing: 0) {
@@ -909,7 +922,9 @@ struct DashboardView: View {
 struct JournalView: View {
     @ObservedObject var model: AppModel
     var body: some View {
-        List(model.journal, id: \.plan.id) { entry in
+        VStack(spacing: 8) {
+            stepBack("返回首页") { model.route = .home }
+            List(model.journal, id: \.plan.id) { entry in
             Button {
                 model.selectedPlanID = entry.plan.id
                 model.route = .tradeDetail
@@ -931,6 +946,7 @@ struct JournalView: View {
         }
         .aquaList()
         .task { await model.perform("journal") }
+        }
     }
 }
 
@@ -938,6 +954,7 @@ struct AuditView: View {
     @ObservedObject var model: AppModel
     var body: some View {
         VStack(spacing: 12) {
+            stepBack("返回首页") { model.route = .home }
             InsetCard {
                 VStack(alignment: .leading, spacing: 8) {
                     TextField("日期 2026-09-25", text: $model.auditDay)
@@ -973,6 +990,7 @@ struct TradeDetailView: View {
         let events = model.audit.filter { $0.planID == planID }
         ScreenScroll {
             VStack(alignment: .leading, spacing: 12) {
+                stepBack("返回") { model.route = .journal }
                 EmbossedTitle(text: model.journal.first { $0.plan.id == planID }?.plan.symbol.normalized ?? "交易", size: .title3)
                 if !model.revisions.isEmpty || !events.isEmpty {
                     InsetCard {
@@ -1021,6 +1039,7 @@ struct SettingsView: View {
     @ObservedObject var model: AppModel
     var body: some View {
         Form {
+            stepBack("返回首页") { model.route = .home }
             Text("Managed YubiKey \(model.snapshot.managedSerial ?? "未登记")")
             Picker("Unlock duration", selection: $model.settings.unlockDurationSeconds) {
                 ForEach(UnlockDuration.allCases, id: \.rawValue) { Text("\($0.rawValue) sec").tag($0.rawValue) }
@@ -1067,6 +1086,7 @@ struct OnboardingView: View {
     var body: some View {
         ScreenScroll {
             VStack(alignment: .leading, spacing: 14) {
+                stepBack("返回首页") { model.route = .home }
                 InsetCard(padding: 0) {
                     VStack(alignment: .leading, spacing: 0) {
                         statusLine(model.snapshot.warning == "无法连接 TradeGate daemon。FIDO 状态未知。" ? "daemon：未连接" : "daemon：已连接")
@@ -1320,6 +1340,14 @@ private struct RecessedWell<Content: View>: View {
             )
             .shadow(color: Color.white.opacity(0.75), radius: 0, y: 1)
     }
+}
+
+@MainActor
+private func stepBack(_ title: String, _ action: @escaping () -> Void) -> some View {
+    Button(title, action: action)
+        .buttonStyle(.plain)
+        .foregroundStyle(AquaTone.secondaryInk)
+        .frame(maxWidth: .infinity, alignment: .leading)
 }
 
 private struct ScreenScroll<Content: View>: View {
