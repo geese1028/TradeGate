@@ -20,6 +20,26 @@ import Testing
     }
 }
 
+@Test func keyWithoutFIDOIsNotManaged() async throws {
+    let selection = await YubiKeyBackend.select(
+        environment: [
+            "TRADEGATE_YKMAN": "/tmp/ykman",
+            "TRADEGATE_DEV_YKMAN": "1",
+        ],
+        runner: { _, arguments in
+            if arguments == ["--version"] {
+                return "YubiKey Manager (ykman) version: 5.9.0"
+            }
+            if arguments.contains("list") {
+                return "YubiKey 5C NFC (5.7.1) [OTP+CCID] Serial: 77\n"
+            }
+            return ""
+        }
+    )
+    let devices = try await selection.controller.listDevices()
+    #expect(devices.isEmpty)
+}
+
 @Test func ykmanSixStaysFailClosed() async throws {
     let selection = await YubiKeyBackend.select(
         environment: [
