@@ -183,6 +183,17 @@ import Testing
     #expect(!(try database.reviewQueue().contains { $0.kind == "emergency" }))
 }
 
+@Test func exportLeavesTheAuditChainAlone() throws {
+    let database = try makeDatabase()
+    _ = try database.createPlan(try entryPlan())
+    let before = try database.auditEvents().count
+    let csv = try database.exportCSV()
+    _ = try database.exportDocument()
+    #expect(csv.contains("NVDA"))
+    #expect(try database.auditEvents().count == before)
+    _ = try database.verifyAuditChain()
+}
+
 private func entryPlan() throws -> TradePlan {
     TradePlan(
         application: .ibkr,

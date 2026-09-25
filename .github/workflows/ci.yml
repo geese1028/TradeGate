@@ -9,6 +9,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Test
         run: swift test
+      - name: Daemon stays up without the app
+        run: ./Scripts/check-daemon.sh
       - name: SwiftFormat
         run: |
           brew install swiftformat

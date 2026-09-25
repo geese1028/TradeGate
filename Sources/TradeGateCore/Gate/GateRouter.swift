@@ -97,6 +97,8 @@ public enum GateRouter {
             return try json(database.reviewQueue())
         case "export":
             return try json(database.exportDocument())
+        case "exportCSV":
+            return try json(database.exportCSV())
         case "backup":
             let body = try decode(PathPayload.self, from: data)
             try database.backup(to: body.path)

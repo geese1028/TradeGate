@@ -237,6 +237,35 @@ extension TradeGateDatabase {
         )
     }
 
+    public func exportCSV() throws -> String {
+        var lines = ["record_type,id,application,symbol,status,price"]
+        for plan in try listPlans() {
+            lines.append(
+                [
+                    "plan",
+                    csv(plan.id),
+                    csv(plan.application.rawValue),
+                    csv(plan.symbol.normalized),
+                    csv(plan.status.rawValue),
+                    csv(plan.entry?.stopPrice?.storage ?? plan.exit?.plannedExitPrice?.storage ?? "")
+                ].joined(separator: ",")
+            )
+        }
+        for execution in try executions(planID: nil) {
+            lines.append(
+                [
+                    "execution",
+                    csv(execution.id),
+                    "",
+                    "",
+                    "",
+                    csv(execution.executionPrice.storage)
+                ].joined(separator: ",")
+            )
+        }
+        return lines.joined(separator: "\n") + "\n"
+    }
+
     public func exportDocument() throws -> TradeGateExport {
         TradeGateExport(
             plans: try listPlans(),
@@ -435,6 +464,13 @@ private func readExecution(_ statement: OpaquePointer) throws -> ExecutionRecord
         confirmedByUser: columnBool(statement, 6),
         reviewRequired: columnBool(statement, 7)
     )
+}
+
+private func csv(_ value: String) -> String {
+    if value.contains(",") || value.contains("\"") || value.contains("\n") {
+        return "\"" + value.replacingOccurrences(of: "\"", with: "\"\"") + "\""
+    }
+    return value
 }
 
 private func signalRank(_ timeframe: SignalTimeframe) -> Int {

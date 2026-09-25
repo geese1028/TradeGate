@@ -692,7 +692,19 @@ struct SettingsView: View {
             Toggle("Notification", isOn: $model.settings.notificationsEnabled)
             Text("Database \(TradeGatePaths.databasePath)")
             Button("保存") { Task { await model.perform("updateSettings", payload: (try? json(model.settings)) ?? "") } }
-            Button("Export JSON") { Task { await model.perform("export") } }
+            Button("Export JSON") {
+                Task { await writeExport(model, name: "tradegate-export.json", action: "export") }
+            }
+            Button("Export CSV") {
+                Task { await writeExport(model, name: "tradegate-export.csv", action: "exportCSV") }
+            }
+            Button("Backup Database") {
+                Task {
+                    let destination = TradeGatePaths.supportDirectory
+                        .appendingPathComponent("backup-\(UUID().uuidString).sqlite").path
+                    await model.perform("backup", payload: #"{"path":"\#(destination)"}"#)
+                }
+            }
         }
     }
 }
@@ -716,6 +728,24 @@ struct OnboardingView: View {
             }
         }
     }
+}
+
+@MainActor
+private func writeExport(_ model: AppModel, name: String, action: String) async {
+    let reply = await model.perform(action)
+    guard let data = reply.data(using: .utf8),
+          let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let result = object["result"]
+    else { return }
+    let output: Data?
+    if let text = result as? String {
+        output = text.data(using: .utf8)
+    } else {
+        output = try? JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys])
+    }
+    guard let output else { return }
+    try? FileManager.default.createDirectory(at: TradeGatePaths.supportDirectory, withIntermediateDirectories: true)
+    try? output.write(to: TradeGatePaths.supportDirectory.appendingPathComponent(name), options: .atomic)
 }
 
 private func labeled(_ title: String, _ value: String) -> some View {
