@@ -26,7 +26,7 @@ public enum YkmanCommandBuilder {
             arguments = ["--device", serial, "info"]
         case let .setUSB(serial, application, enabled):
             let flag = enabled ? "--enable" : "--disable"
-            arguments = ["--device", serial, "config", "usb", flag, application.rawValue]
+            arguments = ["--device", serial, "config", "usb", "-f", flag, application.rawValue]
         }
         try validate(arguments)
         return arguments

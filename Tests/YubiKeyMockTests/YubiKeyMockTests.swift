@@ -81,10 +81,10 @@ import Testing
     try await selection.controller.unlock(deviceID: "42")
     try await selection.controller.lock(deviceID: "42")
     let calls = recorder.calls
-    #expect(calls.contains(["--device", "42", "config", "usb", "--enable", "FIDO2"]))
-    #expect(calls.contains(["--device", "42", "config", "usb", "--enable", "U2F"]))
-    #expect(calls.contains(["--device", "42", "config", "usb", "--disable", "FIDO2"]))
-    #expect(calls.contains(["--device", "42", "config", "usb", "--disable", "U2F"]))
+    #expect(calls.contains(["--device", "42", "config", "usb", "-f", "--enable", "FIDO2"]))
+    #expect(calls.contains(["--device", "42", "config", "usb", "-f", "--enable", "U2F"]))
+    #expect(calls.contains(["--device", "42", "config", "usb", "-f", "--disable", "FIDO2"]))
+    #expect(calls.contains(["--device", "42", "config", "usb", "-f", "--disable", "U2F"]))
     #expect(calls.allSatisfy { !$0.joined(separator: " ").lowercased().contains("reset") })
     #expect(calls.allSatisfy { !$0.joined(separator: " ").lowercased().contains("delete") })
     #expect(calls.allSatisfy { !$0.joined(separator: " ").lowercased().contains("pin") })
@@ -180,8 +180,8 @@ import Testing
     _ = try await controller.listDevices()
     try await controller.lock(deviceID: "42")
     let calls = recorder.calls
-    #expect(calls.contains(["--device", "42", "config", "usb", "--disable", "FIDO2"]))
-    #expect(calls.contains(["--device", "42", "config", "usb", "--disable", "U2F"]))
+    #expect(calls.contains(["--device", "42", "config", "usb", "-f", "--disable", "FIDO2"]))
+    #expect(calls.contains(["--device", "42", "config", "usb", "-f", "--disable", "U2F"]))
     #expect(calls.allSatisfy { call in
         !call.joined(separator: " ").lowercased().contains("reset")
     })
