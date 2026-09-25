@@ -105,6 +105,8 @@ public enum GateRouter {
             return #"{"copied":true}"#
         case "verify":
             return try json(database.verifyAuditChain())
+        case "appStarted":
+            return try json(database.appendAudit(AuditEventDraft(eventType: .appStarted)))
         default:
             throw TradeGateError.invalidState("unknown action \(action)")
         }

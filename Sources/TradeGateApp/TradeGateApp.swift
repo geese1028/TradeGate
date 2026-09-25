@@ -67,6 +67,8 @@ final class AppModel: ObservableObject {
     @Published var auditDay = ""
     @Published var auditSymbol = ""
     @Published var auditEmergencyOnly = false
+    @Published var auditApplication = ""
+    @Published var auditEventType = ""
     @Published var selectedPlanID: String?
     @Published var revisions: [PlanRevision] = []
     @Published var actualTimeframe = PlanTimeframe.threeDay
@@ -103,7 +105,10 @@ final class AppModel: ObservableObject {
         Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor in await self?.refresh() }
         }
-        Task { await refresh() }
+        Task {
+            await refresh()
+            _ = await call("appStarted")
+        }
     }
 
     func refresh() async {
@@ -169,7 +174,9 @@ final class AppModel: ObservableObject {
     func auditPayload() -> String {
         let filter = AuditFilter(
             day: auditDay.isEmpty ? nil : auditDay,
+            application: TradingApplication(rawValue: auditApplication),
             symbol: auditSymbol.isEmpty ? nil : auditSymbol.uppercased(),
+            eventType: AuditEventType(rawValue: auditEventType),
             emergencyOnly: auditEmergencyOnly
         )
         let encoder = JSONEncoder()

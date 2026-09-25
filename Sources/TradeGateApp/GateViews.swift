@@ -1,3 +1,4 @@
+import ServiceManagement
 import SwiftUI
 import TradeGateCore
 
@@ -653,7 +654,13 @@ struct AuditView: View {
     var body: some View {
         VStack {
             TextField("日期 2026-09-25", text: $model.auditDay)
+            Picker("应用", selection: $model.auditApplication) {
+                Text("全部").tag("")
+                Text("IBKR").tag("ibkr")
+                Text("Kraken").tag("kraken")
+            }
             TextField("标的", text: $model.auditSymbol)
+            TextField("事件类型", text: $model.auditEventType)
             Toggle("只看 Emergency", isOn: $model.auditEmergencyOnly)
             Button("筛选") { Task { await model.perform("audit", payload: model.auditPayload()) } }
             List(model.audit, id: \.id) { event in
@@ -713,7 +720,16 @@ struct SettingsView: View {
             Toggle("Start at login", isOn: $model.settings.startAtLogin)
             Toggle("Notification", isOn: $model.settings.notificationsEnabled)
             Text("Database \(TradeGatePaths.databasePath)")
-            Button("保存") { Task { await model.perform("updateSettings", payload: (try? json(model.settings)) ?? "") } }
+            Button("保存") {
+                Task {
+                    await model.perform("updateSettings", payload: (try? json(model.settings)) ?? "")
+                    if model.settings.startAtLogin {
+                        try? SMAppService.mainApp.register()
+                    } else {
+                        try? await SMAppService.mainApp.unregister()
+                    }
+                }
+            }
             Button("Export JSON") {
                 Task { await writeExport(model, name: "tradegate-export.json", action: "export") }
             }

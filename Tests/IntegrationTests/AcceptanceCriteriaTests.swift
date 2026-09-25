@@ -122,6 +122,44 @@ import Testing
     }
 }
 
+@Test func ac13CoversUpdatesDenialRemovalAndErrors() async throws {
+    let harness = try AcceptanceHarness()
+    await harness.coordinator.boot()
+    var waiting = try entryPlan()
+    waiting.entry?.signalStatus = .notAppeared
+    waiting.entry?.signalTimeframe = nil
+    waiting.entry?.stopPrice = nil
+    waiting.entry?.positionMode = nil
+    waiting.entry?.positionValue = nil
+    let saved = try await harness.coordinator.createPlan(waiting)
+    do {
+        try await harness.coordinator.approveAndUnlock(planID: saved.id)
+    } catch is UnlockDenial {}
+    var ready = saved
+    ready.entry?.signalStatus = .appeared
+    ready.entry?.signalTimeframe = .m5
+    ready.entry?.stopPrice = try DecimalValue(parsing: "10")
+    ready.entry?.positionMode = .quantity
+    ready.entry?.positionValue = try DecimalValue(parsing: "1")
+    _ = try await harness.coordinator.updatePlan(ready)
+    try await harness.coordinator.approveAndUnlock(planID: ready.id, now: Date(timeIntervalSince1970: 10))
+    await harness.mock.apply(.removedWhileUnlocked, serialNumber: "111")
+    _ = await harness.coordinator.snapshot(now: Date(timeIntervalSince1970: 15))
+    await harness.mock.apply(.unlocked, serialNumber: "111")
+    await harness.mock.apply(.failure, serialNumber: "111")
+    _ = await harness.coordinator.snapshot(now: Date(timeIntervalSince1970: 20))
+    _ = try await harness.coordinator.recordNoTrade(planID: ready.id, disposition: .noExecution)
+    _ = try harness.database.appendAudit(AuditEventDraft(eventType: .appStarted))
+    let types = try Set(harness.database.auditEvents().map(\.eventType))
+    for required in [
+        AuditEventType.daemonStarted, .planUpdated, .signalConfirmed, .unlockDenied,
+        .deviceRemovedWhileUnlocked, .deviceInserted, .deviceRemoved, .yubiKeyError,
+        .noExecution, .appStarted,
+    ] {
+        #expect(types.contains(required))
+    }
+}
+
 @Test func ac16SourcesDoNotUseNetwork() throws {
     let root = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
