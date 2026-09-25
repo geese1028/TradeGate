@@ -64,6 +64,11 @@ final class AppModel: ObservableObject {
     @Published var emergencyChangedPosition = false
     @Published var emergencyCouldNormal = false
     @Published var reviewWork: [ReviewWorkItem] = []
+    @Published var auditDay = ""
+    @Published var auditSymbol = ""
+    @Published var auditEmergencyOnly = false
+    @Published var selectedPlanID: String?
+    @Published var revisions: [PlanRevision] = []
     @Published var actualTimeframe = PlanTimeframe.threeDay
     @Published var actualMajor = MajorPullback.twoLeg
     @Published var actualMedium = MediumPullback.oneLeg
@@ -137,12 +142,24 @@ final class AppModel: ObservableObject {
         await refresh()
         if let value = decodeEnvelope([TradePlan].self, from: await call("plans")) { plans = value }
         if let value = decodeEnvelope([JournalEntry].self, from: await call("journal")) { journal = value }
-        if let value = decodeEnvelope([AuditEvent].self, from: await call("audit")) { audit = value }
+        if let value = decodeEnvelope([AuditEvent].self, from: await call("audit", auditPayload())) { audit = value }
         if let value = decodeEnvelope(DashboardStats.self, from: await call("dashboard")) { dashboard = value }
         if let value = decodeEnvelope([String].self, from: await call("recentSymbols")) { recentSymbols = value }
         if let value = decodeEnvelope(TradeGateSettings.self, from: await call("settings")) { settings = value }
         if let value = decodeEnvelope([ReviewWorkItem].self, from: await call("reviewQueue")) { reviewWork = value }
         return reply
+    }
+
+    func auditPayload() -> String {
+        let filter = AuditFilter(
+            day: auditDay.isEmpty ? nil : auditDay,
+            symbol: auditSymbol.isEmpty ? nil : auditSymbol.uppercased(),
+            emergencyOnly: auditEmergencyOnly
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        guard let data = try? encoder.encode(filter), let text = String(data: data, encoding: .utf8) else { return "" }
+        return text
     }
 
     func seedReview(_ item: ReviewWorkItem) {
@@ -227,6 +244,7 @@ enum GateRoute {
     case emergencyReview
     case exitReview
     case dashboard
+    case tradeDetail
     case journal
     case audit
     case settings

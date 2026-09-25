@@ -6,6 +6,17 @@ public enum EmergencyValidationError: String, Error, Equatable, Sendable {
     case confirmationPhraseMismatch
 }
 
+public enum EmergencyGate {
+    public static func canStartCountdown(reason: String, phrase: String) -> Bool {
+        reason.trimmingCharacters(in: .whitespacesAndNewlines).count >= EmergencyValidator.minimumReasonLength
+            && phrase == EmergencyValidator.confirmationPhrase
+    }
+
+    public static func canConfirm(armedAt: Date, now: Date, countdownSeconds: Int) -> Bool {
+        now.timeIntervalSince(armedAt) >= TimeInterval(countdownSeconds)
+    }
+}
+
 public enum EmergencyValidator {
     public static let confirmationPhrase = "EMERGENCY UNLOCK"
     public static let minimumReasonLength = 10

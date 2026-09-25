@@ -52,6 +52,7 @@ struct GateRootView: View {
             case .emergencyReview: EmergencyReviewView(model: model)
             case .exitReview: ExitReviewView(model: model)
             case .dashboard: DashboardView(model: model)
+            case .tradeDetail: TradeDetailView(model: model)
             case .journal: JournalView(model: model)
             case .audit: AuditView(model: model)
             case .settings: SettingsView(model: model)
@@ -525,9 +526,14 @@ struct EmergencyView: View {
             TextField("原因（至少 10 个字）", text: $model.emergencyReason)
             TextField("输入 EMERGENCY UNLOCK", text: $model.emergencyPhrase)
             if model.emergencyArmedAt == nil {
-                Button("开始 20 秒倒计时") { model.emergencyArmedAt = Date() }
-                    .disabled(model.emergencyReason.trimmingCharacters(in: .whitespaces).count < 10 || model.emergencyPhrase != "EMERGENCY UNLOCK")
-            } else if Date().timeIntervalSince(model.emergencyArmedAt ?? Date()) < TimeInterval(model.settings.emergencyCountdownSeconds) {
+                Button("开始 \(model.settings.emergencyCountdownSeconds) 秒倒计时") { model.emergencyArmedAt = Date() }
+                    .disabled(!EmergencyGate.canStartCountdown(reason: model.emergencyReason, phrase: model.emergencyPhrase))
+            } else if let armedAt = model.emergencyArmedAt,
+                      !EmergencyGate.canConfirm(
+                        armedAt: armedAt,
+                        now: Date(),
+                        countdownSeconds: model.settings.emergencyCountdownSeconds
+                      ) {
                 Text("请等待倒计时")
             } else {
                 Button("确认紧急解锁") {
@@ -603,12 +609,17 @@ struct JournalView: View {
     @ObservedObject var model: AppModel
     var body: some View {
         List(model.journal, id: \.plan.id) { entry in
-            VStack(alignment: .leading) {
-                Text(entry.plan.symbol.normalized)
-                Text(entry.plan.application.rawValue.uppercased())
-                Text(entry.plan.planType == .entry ? "ENTRY PLAN" : "EXIT PLAN")
-                Text(entry.executions.isEmpty ? "NO EXECUTION" : "EXECUTION")
-                Text(entry.reviewCompleted ? "REVIEW" : "REVIEW REQUIRED")
+            Button {
+                model.selectedPlanID = entry.plan.id
+                model.route = .tradeDetail
+            } label: {
+                VStack(alignment: .leading) {
+                    Text(entry.plan.symbol.normalized)
+                    Text(entry.plan.application.rawValue.uppercased())
+                    Text(entry.plan.planType == .entry ? "ENTRY PLAN" : "EXIT PLAN")
+                    Text(entry.executions.isEmpty ? "NO EXECUTION" : "EXECUTION")
+                    Text(entry.reviewCompleted ? "REVIEW" : "REVIEW REQUIRED")
+                }
             }
         }
         .task { await model.perform("journal") }
@@ -618,10 +629,54 @@ struct JournalView: View {
 struct AuditView: View {
     @ObservedObject var model: AppModel
     var body: some View {
-        List(model.audit, id: \.id) { event in
-            Text("\(event.eventType.rawValue)  \(event.symbol ?? "")")
+        VStack {
+            TextField("日期 2026-09-25", text: $model.auditDay)
+            TextField("标的", text: $model.auditSymbol)
+            Toggle("只看 Emergency", isOn: $model.auditEmergencyOnly)
+            Button("筛选") { Task { await model.perform("audit", payload: model.auditPayload()) } }
+            List(model.audit, id: \.id) { event in
+                Text("\(event.timestampText)  \(event.eventType.rawValue)  \(event.symbol ?? "")")
+            }
         }
-        .task { await model.perform("audit") }
+        .task { await model.perform("audit", payload: model.auditPayload()) }
+    }
+}
+
+struct TradeDetailView: View {
+    @ObservedObject var model: AppModel
+    var body: some View {
+        let planID = model.selectedPlanID
+        let events = model.audit.filter { $0.planID == planID }
+        VStack(alignment: .leading, spacing: 8) {
+            Text(model.journal.first { $0.plan.id == planID }?.plan.symbol.normalized ?? "交易")
+                .font(.title3)
+            ForEach(model.revisions, id: \.id) { revision in
+                Text("Revision \(revision.revisionNumber)  \(revision.createdAt.formatted())")
+            }
+            ForEach(events, id: \.id) { event in
+                Text("\(tradeEventTitle(event.eventType))  \(event.timestampText)")
+            }
+        }
+        .task {
+            guard let planID else { return }
+            let reply = await model.perform("revisions", payload: #"{"id":"\#(planID)"}"#)
+            if let rows = decodeEnvelope([PlanRevision].self, from: reply) {
+                model.revisions = rows
+            }
+        }
+    }
+}
+
+private func tradeEventTitle(_ type: AuditEventType) -> String {
+    switch type {
+    case .planCreated: return "计划创建"
+    case .planUpdated: return "计划修改"
+    case .planApproved: return "计划批准"
+    case .yubiKeyUnlocked: return "YubiKey Unlock"
+    case .executionConfirmed: return "成交"
+    case .reviewCompleted: return "复盘"
+    case .noExecution: return "没有交易"
+    default: return type.rawValue
     }
 }
 
