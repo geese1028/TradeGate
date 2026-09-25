@@ -2,6 +2,7 @@ import Foundation
 import TradeGateCore
 
 let directory = TradeGatePaths.supportDirectory
+TradeGatePaths.adoptNewerRootDatabaseIfNeeded()
 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 let database = try TradeGateDatabase(path: TradeGatePaths.databasePath)
 let selection = await YubiKeyBackend.select()

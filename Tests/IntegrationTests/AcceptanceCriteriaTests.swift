@@ -9,6 +9,14 @@ import Testing
     #expect(await harness.mock.listCount == 1)
 }
 
+@Test func newerRootDatabaseIsAdopted() {
+    let older = Date(timeIntervalSince1970: 10)
+    let newer = Date(timeIntervalSince1970: 20)
+    #expect(TradeGatePaths.shouldAdoptRootDatabase(rootModified: newer, userModified: nil))
+    #expect(TradeGatePaths.shouldAdoptRootDatabase(rootModified: newer, userModified: older))
+    #expect(!TradeGatePaths.shouldAdoptRootDatabase(rootModified: older, userModified: newer))
+}
+
 @Test func daemonPlistAllowsTheAppAndCLI() throws {
     let root = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
