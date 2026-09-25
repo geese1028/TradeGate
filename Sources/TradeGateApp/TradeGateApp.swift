@@ -54,6 +54,7 @@ final class AppModel: ObservableObject {
     @Published var traded = false
     @Published var fillPrice = ""
     @Published var fillSize = ""
+    @Published var fillPositionMode = ExecutionPositionMode.quantity
     @Published var adherence = PlanAdherence.exact
     @Published var deviationReason = ""
     @Published var emergencySymbol = ""
@@ -172,6 +173,17 @@ final class AppModel: ObservableObject {
             reviewWork = value
         }
         return reply
+    }
+
+    func beginExecutionReport() {
+        if draft.entry?.positionMode == .percent || draft.exit?.exitPositionMode == .percent {
+            fillPositionMode = .percent
+        } else if draft.exit?.exitPositionMode == .all, draft.entry == nil {
+            fillPositionMode = .all
+        } else {
+            fillPositionMode = .quantity
+        }
+        traded = true
     }
 
     func beginNewPlan() {

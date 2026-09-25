@@ -399,18 +399,25 @@ struct ExecutionPromptView: View {
                         model.route = .home
                     }
                 }
-                Button("已成交") { model.traded = true }
+                Button("已成交") { model.beginExecutionReport() }
             } else {
                 TextField("实际成交价格", text: $model.fillPrice)
-                TextField("实际成交仓位", text: $model.fillSize)
+                Picker("实际成交仓位", selection: $model.fillPositionMode) {
+                    Text("全部").tag(ExecutionPositionMode.all)
+                    Text("百分比").tag(ExecutionPositionMode.percent)
+                    Text("数量").tag(ExecutionPositionMode.quantity)
+                }
+                if model.fillPositionMode != .all {
+                    TextField("仓位", text: $model.fillSize)
+                }
                 Button("确认成交") {
                     Task {
                         guard let parsedPrice = try? DecimalValue(parsing: model.fillPrice) else { return }
                         let input = ExecutionInput(
                             planID: model.snapshot.activePlanID,
                             price: parsedPrice,
-                            positionMode: .quantity,
-                            positionValue: try? DecimalValue(parsing: model.fillSize)
+                            positionMode: model.fillPositionMode,
+                            positionValue: model.fillPositionMode == .all ? nil : (try? DecimalValue(parsing: model.fillSize))
                         )
                         await model.perform("execution", payload: (try? json(input)) ?? "")
                         model.route = .reviewRequired
