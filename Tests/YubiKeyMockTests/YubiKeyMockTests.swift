@@ -59,10 +59,15 @@ import Testing
     )
     #expect(selection.warning == nil)
     try await selection.controller.unlock(deviceID: "42")
+    try await selection.controller.lock(deviceID: "42")
     let calls = recorder.calls
     #expect(calls.contains(["--device", "42", "config", "usb", "--enable", "FIDO2"]))
     #expect(calls.contains(["--device", "42", "config", "usb", "--enable", "U2F"]))
+    #expect(calls.contains(["--device", "42", "config", "usb", "--disable", "FIDO2"]))
+    #expect(calls.contains(["--device", "42", "config", "usb", "--disable", "U2F"]))
     #expect(calls.allSatisfy { !$0.joined(separator: " ").lowercased().contains("reset") })
+    #expect(calls.allSatisfy { !$0.joined(separator: " ").lowercased().contains("delete") })
+    #expect(calls.allSatisfy { !$0.joined(separator: " ").lowercased().contains("pin") })
 }
 
 @Test func missingYkmanStaysFailClosed() async throws {
