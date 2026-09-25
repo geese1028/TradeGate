@@ -322,7 +322,7 @@ public actor GateCoordinator {
                 try? await yubiKey.lock(deviceID: serial)
             }
         }
-        if !present, state.isIdle {
+        if state.isIdle {
             state = RuleEngine.idleState(facts: (try? currentFacts()) ?? .empty)
         }
         if present, !seenDevice, let serial = managedSerial {

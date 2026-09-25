@@ -215,6 +215,36 @@ import Testing
     #expect(!(try await harness.mock.getState(deviceID: "111").fidoAvailable))
 }
 
+@Test func finishingAnEmergencyReviewClearsTheGate() async throws {
+    let harness = try AcceptanceHarness()
+    await harness.coordinator.boot()
+    let override = try await harness.coordinator.emergencyUnlock(EmergencyOverrideInput(
+        application: .ibkr,
+        symbol: Symbol(raw: "NVDA"),
+        reasonCategory: .positionRisk,
+        reasonText: "need to cut risk",
+        confirmationPhrase: "EMERGENCY UNLOCK"
+    ), now: Date(timeIntervalSince1970: 14_000))
+    await harness.coordinator.expireUnlockWindow(at: Date(timeIntervalSince1970: 14_200))
+    #expect(await harness.coordinator.currentState() == .reviewRequired)
+    let review = try harness.database.startEmergencyReview(overrideID: override.id)
+    _ = try harness.database.completeEmergencyReview(
+        reviewID: review.id,
+        answers: EmergencyReviewAnswers(
+            why: "risk was live",
+            didTrade: false,
+            changedPosition: false,
+            couldHaveUsedNormalFlow: false,
+            howToAvoidNextTime: "write the plan first"
+        )
+    )
+    _ = await harness.coordinator.snapshot(now: Date(timeIntervalSince1970: 14_300))
+    #expect(await harness.coordinator.currentState() != .reviewRequired)
+    let plan = try await harness.coordinator.createPlan(entryPlan())
+    try await harness.coordinator.approveAndUnlock(planID: plan.id, now: Date(timeIntervalSince1970: 14_400))
+    #expect(try await harness.mock.getState(deviceID: "111").fidoAvailable)
+}
+
 @Test func completedReviewAllowsTheNextPlanToUnlock() async throws {
     let harness = try AcceptanceHarness()
     await harness.coordinator.boot()
