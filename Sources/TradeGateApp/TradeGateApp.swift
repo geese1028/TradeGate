@@ -285,19 +285,33 @@ final class AppModel: ObservableObject {
     }
 
     private func translatedValidation(_ error: String) -> String {
-        if error.contains("missingPosition") || error.contains("missingExitPosition") {
-            return "仓位没有填上。百分比可以写 50 或 50%。"
+        let messages = [
+            "emptySymbol": "请填写标的。",
+            "missingTimeframe": "请选择周期。",
+            "missingMajorPullback": "请选择运行级别回调。",
+            "missingMediumPullback": "请选择中周期回调。",
+            "missingSmallDivergence": "请选择底背离级别。",
+            "missingCustomDivergence": "选了「其他」就要写上具体级别。",
+            "missingSignalTimeframe": "信号出现后要选择 5m、30m 或 1H。",
+            "missingStopPrice": "请填写止损价格。",
+            "stopPriceNotPositive": "止损价格要是正数。",
+            "missingPosition": "仓位没有填上。百分比可以写 50 或 50%。",
+            "missingExitPosition": "请选择离场仓位。",
+            "positionNotPositive": "仓位要是正数。",
+            "percentOutOfRange": "百分比要在 0 和 100 之间。",
+            "missingSecondaryState": "请选择次级运行状态。",
+            "missingExitStrategy": "请选择离场计划。",
+            "missingCustomExitStrategy": "选了自定义离场计划，就要写上内容。",
+            "missingPlannedExitPrice": "请填写离场价格。",
+            "exitPriceNotPositive": "离场价格要是正数。",
+            "reasonTooShort": "紧急解锁的原因至少要 10 个字。",
+            "confirmationPhraseMismatch": "确认短语必须是 EMERGENCY UNLOCK。",
+            "missingDeviationReason": "没有完全按计划执行时，要写上偏离原因。",
+        ]
+        for (key, message) in messages where error.contains(key) {
+            return message
         }
-        if error.contains("percentOutOfRange") {
-            return "百分比要在 0 和 100 之间。"
-        }
-        if error.contains("missingPlannedExitPrice") || error.contains("exitPriceNotPositive") {
-            return "离场价格要是一个正数。"
-        }
-        if error.contains("positionNotPositive") || error.contains("stopPriceNotPositive") {
-            return "价格和仓位要是正数。"
-        }
-        return error
+        return "这一步没有通过，请检查刚填的内容。"
     }
 
     private func notify(_ snapshot: GateSnapshot) {
