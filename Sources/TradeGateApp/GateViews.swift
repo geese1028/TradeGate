@@ -9,11 +9,14 @@ struct MenuBarMenu: View {
     var body: some View {
         Text("TradeGate")
         Divider()
-        Text("YubiKey       \(model.snapshot.state == .unlocked ? "🟢 UNLOCKED" : "🔒 LOCKED")")
+        Text("YubiKey       \(menuYubiKeyStatus(model.snapshot.state))")
         Text("待复盘        \(model.snapshot.pendingReviewCount)")
         Text("今日解锁      \(model.snapshot.todayUnlocks)")
         if let remaining = model.snapshot.unlockSecondsRemaining {
             Text(String(format: "%02d:%02d", remaining / 60, remaining % 60))
+        }
+        if let warning = model.snapshot.warning {
+            Text(warning)
         }
         Divider()
         Button("开始交易计划") {
@@ -24,7 +27,7 @@ struct MenuBarMenu: View {
             }
             openWindow(id: "gate")
         }
-        .disabled(model.snapshot.pendingReviewCount > 0 || model.snapshot.state == .unlocked)
+        .disabled(normalPlanDisabled(model.snapshot))
         Button("待复盘") { model.route = .reviewRequired; openWindow(id: "gate") }
         Button("Journal") { model.route = .journal; openWindow(id: "gate") }
         Button("Audit") { model.route = .audit; openWindow(id: "gate") }
@@ -102,14 +105,14 @@ struct HomeView: View {
                 Spacer()
                 Text(model.snapshot.state.menuSymbol)
             }
-            labeled("YubiKey", model.snapshot.state == .unlocked ? "UNLOCKED" : "LOCKED")
+            labeled("YubiKey", menuYubiKeyStatus(model.snapshot.state))
             labeled("待复盘", "\(model.snapshot.pendingReviewCount)")
             labeled("今日解锁", "\(model.snapshot.todayUnlocks)")
             if let warning = model.snapshot.warning {
                 Text(warning).foregroundStyle(.orange)
             }
             Button("开始一次交易计划") { model.beginNewPlan() }
-                .disabled(model.snapshot.pendingReviewCount > 0)
+                .disabled(normalPlanDisabled(model.snapshot))
             HStack {
                 Button("Journal") { model.route = .journal }
                 Button("Audit") { model.route = .audit }
@@ -845,6 +848,28 @@ private func writeExport(_ model: AppModel, name: String, action: String) async 
     guard let output else { return }
     try? FileManager.default.createDirectory(at: TradeGatePaths.supportDirectory, withIntermediateDirectories: true)
     try? output.write(to: TradeGatePaths.supportDirectory.appendingPathComponent(name), options: .atomic)
+}
+
+private func menuYubiKeyStatus(_ state: GateState) -> String {
+    switch state {
+    case .unlocked:
+        return "🟢 UNLOCKED"
+    case .lockStateUnknown:
+        return "⚠️ UNKNOWN"
+    case .errorFailClosed:
+        return "⚠️ ERROR"
+    case .reviewRequired:
+        return "⚠️ REVIEW"
+    default:
+        return "🔒 LOCKED"
+    }
+}
+
+private func normalPlanDisabled(_ snapshot: GateSnapshot) -> Bool {
+    snapshot.pendingReviewCount > 0
+        || snapshot.state == .unlocked
+        || snapshot.state == .lockStateUnknown
+        || snapshot.state == .errorFailClosed
 }
 
 private func labeled(_ title: String, _ value: String) -> some View {
