@@ -215,6 +215,22 @@ import Testing
     #expect(!(try await harness.mock.getState(deviceID: "111").fidoAvailable))
 }
 
+@Test func noExecutionAllowsTheNextPlanToUnlock() async throws {
+    let harness = try AcceptanceHarness()
+    await harness.coordinator.boot()
+    let first = try await harness.coordinator.createPlan(entryPlan())
+    try await harness.coordinator.approveAndUnlock(planID: first.id, now: Date(timeIntervalSince1970: 12_000))
+    await harness.coordinator.expireUnlockWindow(at: Date(timeIntervalSince1970: 12_200))
+    _ = try await harness.coordinator.recordNoTrade(planID: first.id, disposition: .noExecution)
+    #expect(try harness.database.pendingReviewCount() == 0)
+    var second = try entryPlan()
+    second.symbol = Symbol(raw: "MSFT")
+    second = try await harness.coordinator.createPlan(second)
+    #expect(await harness.coordinator.currentState() == .ready)
+    try await harness.coordinator.approveAndUnlock(planID: second.id, now: Date(timeIntervalSince1970: 12_300))
+    #expect(try await harness.mock.getState(deviceID: "111").fidoAvailable)
+}
+
 @Test func exitPlanUnlocksWithoutAnEntrySignal() async throws {
     let harness = try AcceptanceHarness()
     await harness.coordinator.boot()
