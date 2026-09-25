@@ -215,6 +215,20 @@ import Testing
     #expect(!(try await harness.mock.getState(deviceID: "111").fidoAvailable))
 }
 
+@Test func lockThatLeavesFIDOEnabledIsUnknown() async throws {
+    let harness = try AcceptanceHarness()
+    await harness.coordinator.boot()
+    let plan = try await harness.coordinator.createPlan(entryPlan())
+    let start = Date(timeIntervalSince1970: 15_000)
+    try await harness.coordinator.approveAndUnlock(planID: plan.id, now: start)
+    await harness.mock.setLockLeavesEnabled(true)
+    _ = await harness.coordinator.snapshot(now: start.addingTimeInterval(120))
+    #expect(await harness.coordinator.currentState() == .lockStateUnknown)
+    #expect(try await harness.mock.getState(deviceID: "111").fidoAvailable)
+    let snapshot = await harness.coordinator.snapshot(now: start.addingTimeInterval(121))
+    #expect(snapshot.warning == "无法确认 FIDO 已关闭。")
+}
+
 @Test func unlockThatDoesNotEnableFIDODoesNotCountAsOpen() async throws {
     let harness = try AcceptanceHarness()
     await harness.coordinator.boot()
