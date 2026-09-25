@@ -215,6 +215,28 @@ import Testing
     #expect(!(try await harness.mock.getState(deviceID: "111").fidoAvailable))
 }
 
+@Test func completedReviewAllowsTheNextPlanToUnlock() async throws {
+    let harness = try AcceptanceHarness()
+    await harness.coordinator.boot()
+    let first = try await harness.coordinator.createPlan(entryPlan())
+    try await harness.coordinator.approveAndUnlock(planID: first.id, now: Date(timeIntervalSince1970: 13_000))
+    await harness.coordinator.expireUnlockWindow(at: Date(timeIntervalSince1970: 13_200))
+    let execution = try await harness.coordinator.confirmExecution(ExecutionInput(
+        planID: first.id,
+        price: try DecimalValue(parsing: "11"),
+        positionMode: .quantity,
+        positionValue: try DecimalValue(parsing: "1")
+    ))
+    let review = try harness.database.startReview(executionID: execution.id)
+    _ = try harness.database.completeEntryReview(reviewID: review.id, actuals: entryActuals())
+    #expect(try harness.database.pendingReviewCount() == 0)
+    var second = try entryPlan()
+    second.symbol = Symbol(raw: "AAPL")
+    second = try await harness.coordinator.createPlan(second)
+    try await harness.coordinator.approveAndUnlock(planID: second.id, now: Date(timeIntervalSince1970: 13_300))
+    #expect(try await harness.mock.getState(deviceID: "111").fidoAvailable)
+}
+
 @Test func noExecutionAllowsTheNextPlanToUnlock() async throws {
     let harness = try AcceptanceHarness()
     await harness.coordinator.boot()
