@@ -311,7 +311,10 @@ final class AppModel: ObservableObject {
         for (key, message) in messages where error.contains(key) {
             return message
         }
-        return "这一步没有通过，请检查刚填的内容。"
+        if error.contains("TradeGateCore") || error.contains("validation(") {
+            return "这一步没有通过，请检查刚填的内容。"
+        }
+        return error
     }
 
     private func notify(_ snapshot: GateSnapshot) {
