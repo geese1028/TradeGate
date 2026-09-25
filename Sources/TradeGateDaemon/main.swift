@@ -55,4 +55,6 @@ let delegate = DaemonDelegate(coordinator: coordinator, database: database)
 let listener = NSXPCListener(machServiceName: TradeGatePaths.machService)
 listener.delegate = delegate
 listener.resume()
-dispatchMain()
+while true {
+    try await Task.sleep(for: .seconds(3600))
+}
