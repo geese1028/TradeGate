@@ -45,6 +45,11 @@ final class ReplyBox: @unchecked Sendable {
 
 public enum TradeGatePaths {
     public static var supportDirectory: URL {
+        if let override = ProcessInfo.processInfo.environment["TRADEGATE_SUPPORT_DIR"],
+           !override.isEmpty
+        {
+            return URL(fileURLWithPath: override, isDirectory: true)
+        }
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support")
         return base.appendingPathComponent("TradeGate", isDirectory: true)

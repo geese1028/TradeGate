@@ -11,6 +11,8 @@ swift run TradeGateApp --in-process
 
 `swift run TradeGateDaemon` does not register the Mach service, so `tradegate status` cannot see it. `Scripts/check-xpc.sh` loads a temporary user agent, reads status over XPC, and removes the agent.
 
+`Scripts/check-daemon.sh` is the AC-15 check. It loads a temporary mock agent, quits a client that was talking to that agent, waits through more than one poll, and checks that the same process still answers. The agent uses `TRADEGATE_SUPPORT_DIR` so the check does not write the normal database. It does not call `SMAppService` and does not show the administrator approval dialog.
+
 The daemon polls once a second and relocks FIDO when the unlock window ends, even if the menu bar app is closed.
 
 `Scripts/package.sh` builds a `dist/TradeGate.app` bundle with the daemon plist. The CLI is `Contents/Helpers/tradegate`, because a case-insensitive disk treats `tradegate` and `TradeGate` as the same file inside `Contents/MacOS`. Real key tests:

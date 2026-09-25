@@ -2,6 +2,25 @@ import Foundation
 import Testing
 @testable import TradeGateCore
 
+@Test func supportDirectoryCanBeIsolated() {
+    let key = "TRADEGATE_SUPPORT_DIR"
+    let previous = getenv(key).map { String(cString: $0) }
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("tradegate-support-\(UUID().uuidString)", isDirectory: true)
+    setenv(key, directory.path, 1)
+    defer {
+        if let previous {
+            setenv(key, previous, 1)
+        } else {
+            unsetenv(key)
+        }
+    }
+    let expected = URL(fileURLWithPath: directory.path, isDirectory: true)
+        .appendingPathComponent("tradegate.sqlite")
+        .path
+    #expect(TradeGatePaths.databasePath == expected)
+}
+
 @Test func xpcSnapshotRoundTrip() async throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent("tradegate-xpc-\(UUID().uuidString).sqlite")
     let database = try TradeGateDatabase(path: url.path)
