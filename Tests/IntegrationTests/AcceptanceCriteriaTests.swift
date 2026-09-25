@@ -9,6 +9,17 @@ import Testing
     #expect(await harness.mock.listCount == 1)
 }
 
+@Test func daemonPlistAllowsTheAppAndCLI() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let text = try String(contentsOf: root.appendingPathComponent("Packaging/com.tradegate.daemon.plist"), encoding: .utf8)
+    #expect(text.contains("SMAuthorizedClients"))
+    #expect(text.contains("com.tradegate.app"))
+    #expect(text.contains("com.tradegate.cli"))
+}
+
 @Test func snapshotNamesTheHelper() async throws {
     let harness = try AcceptanceHarness()
     let snapshot = await harness.coordinator.snapshot()

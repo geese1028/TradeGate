@@ -18,7 +18,7 @@ test "$app" = "$src"
 test "$app" != "$cli"
 # SMAppService rejects a LaunchDaemon plist that is not sealed into the app signature.
 codesign --force --sign - "$root/MacOS/TradeGateDaemon"
-codesign --force --sign - "$root/Helpers/tradegate"
+codesign --force --sign - --identifier com.tradegate.cli "$root/Helpers/tradegate"
 codesign --force --sign - "dist/TradeGate.app"
 codesign --verify --deep --strict "dist/TradeGate.app"
 echo "packaged dist/TradeGate.app"

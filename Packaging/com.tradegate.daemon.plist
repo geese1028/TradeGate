@@ -11,5 +11,10 @@
         <key>com.tradegate.daemon</key>
         <true/>
     </dict>
+    <key>SMAuthorizedClients</key>
+    <array>
+        <string>identifier "com.tradegate.app"</string>
+        <string>identifier "com.tradegate.cli"</string>
+    </array>
 </dict>
 </plist>
