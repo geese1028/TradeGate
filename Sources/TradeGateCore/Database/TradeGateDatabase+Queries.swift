@@ -66,7 +66,9 @@ public struct ReviewWorkItem: Equatable, Sendable, Codable, Identifiable {
     public var plan: TradePlan?
     public var execution: ExecutionRecord?
 
-    public var id: String { "\(kind)-\(targetID)" }
+    public var id: String {
+        "\(kind)-\(targetID)"
+    }
 
     public init(
         kind: String,
@@ -97,18 +99,20 @@ public struct JournalEntry: Equatable, Sendable, Codable {
     }
 }
 
-extension TradeGateDatabase {
-    public func listPlans() throws -> [TradePlan] {
+public extension TradeGateDatabase {
+    func listPlans() throws -> [TradePlan] {
         try locked {
             var ids: [String] = []
             try connection.query("SELECT id FROM trade_plans ORDER BY updated_at DESC;") { statement in
-                if let id = columnText(statement, 0) { ids.append(id) }
+                if let id = columnText(statement, 0) {
+                    ids.append(id)
+                }
             }
             return try ids.compactMap { try planLocked(id: $0) }
         }
     }
 
-    public func recentSymbols(limit: Int = 8) throws -> [String] {
+    func recentSymbols(limit: Int = 8) throws -> [String] {
         try locked {
             var symbols: [String] = []
             try connection.query(
@@ -120,13 +124,15 @@ extension TradeGateDatabase {
                 """,
                 bindings: [.integer(Int64(limit))]
             ) { statement in
-                if let symbol = columnText(statement, 0) { symbols.append(symbol) }
+                if let symbol = columnText(statement, 0) {
+                    symbols.append(symbol)
+                }
             }
             return symbols
         }
     }
 
-    public func executions(planID: String?) throws -> [ExecutionRecord] {
+    func executions(planID: String?) throws -> [ExecutionRecord] {
         try locked {
             var rows: [ExecutionRecord] = []
             let sql: String
@@ -139,13 +145,13 @@ extension TradeGateDatabase {
                 bindings = []
             }
             try connection.query(sql, bindings: bindings) { statement in
-                rows.append(try readExecution(statement))
+                try rows.append(readExecution(statement))
             }
             return rows
         }
     }
 
-    public func todayUnlockCount(now: Date = Date()) throws -> Int {
+    func todayUnlockCount(now: Date = Date()) throws -> Int {
         let start = Timestamp.string(from: Calendar.current.startOfDay(for: now))
         return try locked {
             var count = 0
@@ -164,24 +170,34 @@ extension TradeGateDatabase {
         }
     }
 
-    public func filteredAuditEvents(_ filter: AuditFilter) throws -> [AuditEvent] {
+    func filteredAuditEvents(_ filter: AuditFilter) throws -> [AuditEvent] {
         try auditEvents().filter { event in
-            if let day = filter.day, !event.timestampText.hasPrefix(day) { return false }
-            if let application = filter.application, event.application != application { return false }
-            if let symbol = filter.symbol, event.symbol != symbol { return false }
-            if let eventType = filter.eventType, event.eventType != eventType { return false }
+            if let day = filter.day, !event.timestampText.hasPrefix(day) {
+                return false
+            }
+            if let application = filter.application, event.application != application {
+                return false
+            }
+            if let symbol = filter.symbol, event.symbol != symbol {
+                return false
+            }
+            if let eventType = filter.eventType, event.eventType != eventType {
+                return false
+            }
             if filter.emergencyOnly {
                 let emergencyTypes: Set<AuditEventType> = [
-                    .emergencyOverrideRequested, .emergencyOverrideApproved
+                    .emergencyOverrideRequested, .emergencyOverrideApproved,
                 ]
                 let metadataEmergency = event.metadataJSON.contains("emergency")
-                if !emergencyTypes.contains(event.eventType) && !metadataEmergency { return false }
+                if !emergencyTypes.contains(event.eventType), !metadataEmergency {
+                    return false
+                }
             }
             return true
         }
     }
 
-    public func journal() throws -> [JournalEntry] {
+    func journal() throws -> [JournalEntry] {
         let plans = try listPlans()
         return try plans.map { plan in
             let fills = try executions(planID: plan.id)
@@ -190,7 +206,7 @@ extension TradeGateDatabase {
         }
     }
 
-    public func dashboard(since: Date) throws -> DashboardStats {
+    func dashboard(since: Date) throws -> DashboardStats {
         let sinceText = Timestamp.string(from: since)
         let events = try auditEvents().filter { $0.timestampText >= sinceText }
         let plans = try listPlans()
@@ -214,12 +230,15 @@ extension TradeGateDatabase {
                   let actuals = try? JSONDecoder().decode(EntryReviewActuals.self, from: data),
                   let entry = plan.entry
             else { continue }
-            if actuals.stopPrice != entry.stopPrice { stopDeviation += 1 }
+            if actuals.stopPrice != entry.stopPrice {
+                stopDeviation += 1
+            }
             if actuals.positionMode != entry.positionMode || actuals.positionValue != entry.positionValue {
                 positionDeviation += 1
             }
             if let planned = entry.signalTimeframe, let actual = actuals.signalTimeframe,
-               signalRank(actual) < signalRank(planned) {
+               signalRank(actual) < signalRank(planned)
+            {
                 earlyEntry += 1
             }
         }
@@ -237,7 +256,7 @@ extension TradeGateDatabase {
         )
     }
 
-    public func exportCSV() throws -> String {
+    func exportCSV() throws -> String {
         var lines = ["record_type,id,application,symbol,status,price"]
         for plan in try listPlans() {
             lines.append(
@@ -247,7 +266,7 @@ extension TradeGateDatabase {
                     csv(plan.application.rawValue),
                     csv(plan.symbol.normalized),
                     csv(plan.status.rawValue),
-                    csv(plan.entry?.stopPrice?.storage ?? plan.exit?.plannedExitPrice?.storage ?? "")
+                    csv(plan.entry?.stopPrice?.storage ?? plan.exit?.plannedExitPrice?.storage ?? ""),
                 ].joined(separator: ",")
             )
         }
@@ -259,24 +278,24 @@ extension TradeGateDatabase {
                     "",
                     "",
                     "",
-                    csv(execution.executionPrice.storage)
+                    csv(execution.executionPrice.storage),
                 ].joined(separator: ",")
             )
         }
         return lines.joined(separator: "\n") + "\n"
     }
 
-    public func exportDocument() throws -> TradeGateExport {
-        TradeGateExport(
-            plans: try listPlans(),
-            revisions: try allRevisions(),
-            executions: try executions(planID: nil),
-            reviews: try allReviews(),
-            auditEvents: try auditEvents()
+    func exportDocument() throws -> TradeGateExport {
+        try TradeGateExport(
+            plans: listPlans(),
+            revisions: allRevisions(),
+            executions: executions(planID: nil),
+            reviews: allReviews(),
+            auditEvents: auditEvents()
         )
     }
 
-    public func backup(to destination: String) throws {
+    func backup(to destination: String) throws {
         try locked {
             try connection.execute("PRAGMA wal_checkpoint(FULL);")
         }
@@ -286,7 +305,7 @@ extension TradeGateDatabase {
         try FileManager.default.copyItem(atPath: path, toPath: destination)
     }
 
-    public func setFlag(_ key: String, _ value: String) throws {
+    func setFlag(_ key: String, _ value: String) throws {
         try locked {
             try connection.run(
                 """
@@ -298,7 +317,7 @@ extension TradeGateDatabase {
         }
     }
 
-    public func flag(_ key: String) throws -> String? {
+    func flag(_ key: String) throws -> String? {
         try locked {
             var value: String?
             try connection.query("SELECT value FROM settings WHERE key = ?;", bindings: [.text(key)]) { statement in
@@ -322,7 +341,9 @@ extension TradeGateDatabase {
             ) { _ in
                 done = true
             }
-            if !done { return false }
+            if !done {
+                return false
+            }
         }
         return true
     }
@@ -337,13 +358,13 @@ extension TradeGateDatabase {
                 FROM reviews ORDER BY created_at ASC;
                 """
             ) { statement in
-                rows.append(
+                try rows.append(
                     ReviewRecord(
                         id: columnText(statement, 0) ?? "",
                         executionID: columnText(statement, 1),
                         emergencyOverrideID: columnText(statement, 2),
-                        createdAt: try Timestamp.date(from: columnText(statement, 3) ?? ""),
-                        completedAt: try columnText(statement, 4).map { try Timestamp.date(from: $0) },
+                        createdAt: Timestamp.date(from: columnText(statement, 3) ?? ""),
+                        completedAt: columnText(statement, 4).map { try Timestamp.date(from: $0) },
                         actualJSON: columnText(statement, 5) ?? "{}",
                         planAdherence: columnText(statement, 6).flatMap(PlanAdherence.init(rawValue:)),
                         deviationReason: columnText(statement, 7),
@@ -360,7 +381,7 @@ extension TradeGateDatabase {
         return try plans.flatMap { try revisions(planID: $0.id) }
     }
 
-    public func reviewQueue() throws -> [ReviewWorkItem] {
+    func reviewQueue() throws -> [ReviewWorkItem] {
         try locked {
             var items: [ReviewWorkItem] = []
             var executionIDs: [String] = []
@@ -374,7 +395,9 @@ extension TradeGateDatabase {
                   );
                 """
             ) { statement in
-                if let id = columnText(statement, 0) { executionIDs.append(id) }
+                if let id = columnText(statement, 0) {
+                    executionIDs.append(id)
+                }
             }
             for id in executionIDs {
                 var execution: ExecutionRecord?
@@ -385,11 +408,10 @@ extension TradeGateDatabase {
                     execution = try readExecution(statement)
                 }
                 guard let execution else { continue }
-                let plan: TradePlan?
-                if let planID = execution.planID {
-                    plan = try planLocked(id: planID)
+                let plan: TradePlan? = if let planID = execution.planID {
+                    try planLocked(id: planID)
                 } else {
-                    plan = nil
+                    nil
                 }
                 items.append(ReviewWorkItem(
                     kind: plan?.planType == .exit ? "exit" : "entry",
@@ -454,13 +476,13 @@ private func readExecution(_ statement: OpaquePointer) throws -> ExecutionRecord
     guard let mode = ExecutionPositionMode(rawValue: columnText(statement, 4) ?? "") else {
         throw TradeGateError.invalidState("bad execution position mode")
     }
-    return ExecutionRecord(
+    return try ExecutionRecord(
         id: columnText(statement, 0) ?? "",
         planID: columnText(statement, 1),
-        executedAt: try Timestamp.date(from: columnText(statement, 2) ?? ""),
-        executionPrice: try DecimalValue(parsing: columnText(statement, 3) ?? ""),
+        executedAt: Timestamp.date(from: columnText(statement, 2) ?? ""),
+        executionPrice: DecimalValue(parsing: columnText(statement, 3) ?? ""),
         executionPositionMode: mode,
-        executionPositionValue: try decimalColumn(statement, 5),
+        executionPositionValue: decimalColumn(statement, 5),
         confirmedByUser: columnBool(statement, 6),
         reviewRequired: columnBool(statement, 7)
     )
@@ -475,9 +497,9 @@ private func csv(_ value: String) -> String {
 
 private func signalRank(_ timeframe: SignalTimeframe) -> Int {
     switch timeframe {
-    case .m5: return 1
-    case .m30: return 2
-    case .h1: return 3
+    case .m5: 1
+    case .m30: 2
+    case .h1: 3
     }
 }
 

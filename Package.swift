@@ -5,19 +5,19 @@ import PackageDescription
 let package = Package(
     name: "TradeGate",
     platforms: [
-        .macOS(.v13)
+        .macOS(.v13),
     ],
     products: [
         .library(name: "TradeGateCore", targets: ["TradeGateCore"]),
         .executable(name: "TradeGateApp", targets: ["TradeGateApp"]),
         .executable(name: "TradeGateDaemon", targets: ["TradeGateDaemon"]),
-        .executable(name: "tradegate", targets: ["TradeGateCLI"])
+        .executable(name: "tradegate", targets: ["TradeGateCLI"]),
     ],
     targets: [
         .target(
             name: "TradeGateCore",
             linkerSettings: [
-                .linkedLibrary("sqlite3")
+                .linkedLibrary("sqlite3"),
             ]
         ),
         .executableTarget(name: "TradeGateApp", dependencies: ["TradeGateCore"]),
@@ -31,7 +31,7 @@ let package = Package(
             name: "DatabaseTests",
             dependencies: ["TradeGateCore"],
             linkerSettings: [
-                .linkedLibrary("sqlite3")
+                .linkedLibrary("sqlite3"),
             ]
         ),
         .testTarget(name: "StateMachineTests", dependencies: ["TradeGateCore"]),
@@ -40,6 +40,6 @@ let package = Package(
             name: "IntegrationTests",
             dependencies: ["TradeGateCore"],
             linkerSettings: [.linkedLibrary("sqlite3")]
-        )
+        ),
     ]
 )

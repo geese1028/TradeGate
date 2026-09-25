@@ -27,26 +27,26 @@ public enum GateRouter {
         let data = Data(payload.utf8)
         switch action {
         case "snapshot":
-            return try json(await coordinator.snapshot())
+            return try await json(coordinator.snapshot())
         case "createPlan":
-            return try json(await coordinator.createPlan(try decode(TradePlan.self, from: data)))
+            return try await json(coordinator.createPlan(decode(TradePlan.self, from: data)))
         case "updatePlan":
-            return try json(await coordinator.updatePlan(try decode(TradePlan.self, from: data)))
+            return try await json(coordinator.updatePlan(decode(TradePlan.self, from: data)))
         case "approve":
             let body = try decode(IDPayload.self, from: data)
             try await coordinator.approveAndUnlock(planID: body.id)
-            return try json(await coordinator.snapshot())
+            return try await json(coordinator.snapshot())
         case "noTrade":
             let body = try decode(NoTradePayload.self, from: data)
-            return try json(await coordinator.recordNoTrade(planID: body.id, disposition: body.disposition))
+            return try await json(coordinator.recordNoTrade(planID: body.id, disposition: body.disposition))
         case "execution":
-            return try json(await coordinator.confirmExecution(try decode(ExecutionInput.self, from: data)))
+            return try await json(coordinator.confirmExecution(decode(ExecutionInput.self, from: data)))
         case "emergency":
-            return try json(await coordinator.emergencyUnlock(try decode(EmergencyOverrideInput.self, from: data)))
+            return try await json(coordinator.emergencyUnlock(decode(EmergencyOverrideInput.self, from: data)))
         case "journal":
             return try json(database.journal())
         case "audit":
-            return try json(database.filteredAuditEvents(payload.isEmpty ? AuditFilter() : try decode(AuditFilter.self, from: data)))
+            return try json(database.filteredAuditEvents(payload.isEmpty ? AuditFilter() : decode(AuditFilter.self, from: data)))
         case "dashboard":
             return try json(database.dashboard(since: Date().addingTimeInterval(-30 * 24 * 3600)))
         case "plans":
@@ -67,15 +67,15 @@ public enum GateRouter {
             return try json(database.settings())
         case "acknowledge":
             try await coordinator.acknowledgeError()
-            return try json(await coordinator.snapshot())
+            return try await json(coordinator.snapshot())
         case "register":
             let body = try decode(IDPayload.self, from: data)
             try await coordinator.registerDevice(serial: body.id)
-            return try json(await coordinator.snapshot())
+            return try await json(coordinator.snapshot())
         case "onboardingCycle":
             let body = try decode(IDPayload.self, from: data)
             try await coordinator.onboardingLockCycle(serial: body.id)
-            return try json(await coordinator.snapshot())
+            return try await json(coordinator.snapshot())
         case "startReview":
             let body = try decode(IDPayload.self, from: data)
             return try json(database.startReview(executionID: body.id))
@@ -110,7 +110,7 @@ public enum GateRouter {
         }
     }
 
-    private static func json<T: Encodable>(_ value: T) throws -> String {
+    private static func json(_ value: some Encodable) throws -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
@@ -127,12 +127,16 @@ public enum GateRouter {
 
 public struct IDPayload: Codable, Sendable {
     public var id: String
-    public init(id: String) { self.id = id }
+    public init(id: String) {
+        self.id = id
+    }
 }
 
 public struct PathPayload: Codable, Sendable {
     public var path: String
-    public init(path: String) { self.path = path }
+    public init(path: String) {
+        self.path = path
+    }
 }
 
 public struct NoTradePayload: Codable, Sendable {

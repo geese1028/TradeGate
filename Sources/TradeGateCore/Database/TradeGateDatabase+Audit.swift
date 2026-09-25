@@ -1,7 +1,7 @@
 import Foundation
 
-extension TradeGateDatabase {
-    public func appendAudit(_ draft: AuditEventDraft) throws -> AuditEvent {
+public extension TradeGateDatabase {
+    func appendAudit(_ draft: AuditEventDraft) throws -> AuditEvent {
         try locked {
             try transaction {
                 try appendAuditLocked(draft)
@@ -9,11 +9,11 @@ extension TradeGateDatabase {
         }
     }
 
-    public func auditEvents() throws -> [AuditEvent] {
+    func auditEvents() throws -> [AuditEvent] {
         try locked { try auditEventsLocked() }
     }
 
-    public func verifyAuditChain() throws -> AuditVerification {
+    func verifyAuditChain() throws -> AuditVerification {
         try locked {
             let events = try auditEventsLocked()
             var previous = AuditHasher.genesisPrevHash
@@ -32,7 +32,7 @@ extension TradeGateDatabase {
         }
     }
 
-    func appendAuditLocked(_ draft: AuditEventDraft) throws -> AuditEvent {
+    internal func appendAuditLocked(_ draft: AuditEventDraft) throws -> AuditEvent {
         let metadataJSON = try CanonicalJSON.metadata(draft.metadata)
         let id = UUID().uuidString
         let timestamp = Timestamp.string(from: draft.timestamp)
@@ -69,7 +69,7 @@ extension TradeGateDatabase {
                 textBinding(draft.unlockSessionID),
                 .text(metadataJSON),
                 .text(previous),
-                .text(eventHash)
+                .text(eventHash),
             ]
         )
         return AuditEvent(
@@ -89,7 +89,7 @@ extension TradeGateDatabase {
         )
     }
 
-    func auditEventsLocked() throws -> [AuditEvent] {
+    internal func auditEventsLocked() throws -> [AuditEvent] {
         var rows: [AuditEvent] = []
         try connection.query(
             """
@@ -104,10 +104,10 @@ extension TradeGateDatabase {
             }
             let application = columnText(statement, 3).flatMap(TradingApplication.init(rawValue:))
             let timestampText = columnText(statement, 1) ?? ""
-            rows.append(
+            try rows.append(
                 AuditEvent(
                     id: columnText(statement, 0) ?? "",
-                    timestamp: try Timestamp.date(from: timestampText),
+                    timestamp: Timestamp.date(from: timestampText),
                     eventType: eventType,
                     application: application,
                     symbol: columnText(statement, 4),

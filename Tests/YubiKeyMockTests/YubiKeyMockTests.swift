@@ -12,7 +12,7 @@ import Testing
     try await mock.unlock(deviceID: "12345678")
     #expect(try await mock.getState(deviceID: "12345678").fidoAvailable)
     try await mock.lock(deviceID: "12345678")
-    #expect(!(try await mock.getState(deviceID: "12345678").fidoAvailable))
+    #expect(try await !(mock.getState(deviceID: "12345678").fidoAvailable))
     await mock.apply(.failure)
     do {
         try await mock.unlock(deviceID: "12345678")
@@ -28,7 +28,7 @@ import Testing
     let commands: [YkmanCommand] = [
         .version, .list, .info(serial: "123"),
         .setUSB(serial: "123", application: .fido2, enabled: false),
-        .setUSB(serial: "123", application: .u2f, enabled: true)
+        .setUSB(serial: "123", application: .u2f, enabled: true),
     ]
     for command in commands {
         let arguments = try YkmanCommandBuilder.arguments(for: command)
@@ -90,5 +90,7 @@ import Testing
 
 private final class YkmanCallRecorder: @unchecked Sendable {
     var calls: [[String]] = []
-    func record(_ arguments: [String]) { calls.append(arguments) }
+    func record(_ arguments: [String]) {
+        calls.append(arguments)
+    }
 }

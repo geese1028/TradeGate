@@ -1,7 +1,7 @@
 import Foundation
 
-extension TradeGateDatabase {
-    public func createPlan(_ plan: TradePlan) throws -> TradePlan {
+public extension TradeGateDatabase {
+    func createPlan(_ plan: TradePlan) throws -> TradePlan {
         let validation = PlanValidator.validate(plan)
         guard validation.canSave else {
             throw TradeGateError.validation(validation.errors)
@@ -30,7 +30,7 @@ extension TradeGateDatabase {
         }
     }
 
-    public func updatePlan(_ plan: TradePlan) throws -> TradePlan {
+    func updatePlan(_ plan: TradePlan) throws -> TradePlan {
         let validation = PlanValidator.validate(plan)
         guard validation.canSave else {
             throw TradeGateError.validation(validation.errors)
@@ -60,7 +60,7 @@ extension TradeGateDatabase {
                         timestamp: existing.updatedAt
                     )
                 )
-                if previousSignal != .appeared && existing.entry?.signalStatus == .appeared {
+                if previousSignal != .appeared, existing.entry?.signalStatus == .appeared {
                     _ = try appendAuditLocked(
                         AuditEventDraft(
                             eventType: .signalConfirmed,
@@ -76,7 +76,7 @@ extension TradeGateDatabase {
         }
     }
 
-    public func approvePlan(id: String) throws -> TradePlan {
+    func approvePlan(id: String) throws -> TradePlan {
         try locked {
             guard var existing = try planLocked(id: id) else {
                 throw TradeGateError.notFound(id)
@@ -108,7 +108,7 @@ extension TradeGateDatabase {
         }
     }
 
-    public func recordNoTrade(planID: String, disposition: NoTradeDisposition) throws -> TradePlan {
+    func recordNoTrade(planID: String, disposition: NoTradeDisposition) throws -> TradePlan {
         try locked {
             guard var existing = try planLocked(id: planID) else {
                 throw TradeGateError.notFound(planID)
@@ -134,11 +134,11 @@ extension TradeGateDatabase {
         }
     }
 
-    public func plan(id: String) throws -> TradePlan? {
+    func plan(id: String) throws -> TradePlan? {
         try locked { try planLocked(id: id) }
     }
 
-    public func revisions(planID: String) throws -> [PlanRevision] {
+    func revisions(planID: String) throws -> [PlanRevision] {
         try locked {
             var rows: [PlanRevision] = []
             try connection.query(
@@ -150,12 +150,12 @@ extension TradeGateDatabase {
                 """,
                 bindings: [.text(planID)]
             ) { statement in
-                rows.append(
+                try rows.append(
                     PlanRevision(
                         id: columnText(statement, 0) ?? "",
                         planID: columnText(statement, 1) ?? "",
                         revisionNumber: Int(columnInt(statement, 2)),
-                        createdAt: try Timestamp.date(from: columnText(statement, 3) ?? ""),
+                        createdAt: Timestamp.date(from: columnText(statement, 3) ?? ""),
                         snapshotJSON: columnText(statement, 4) ?? ""
                     )
                 )
@@ -164,7 +164,7 @@ extension TradeGateDatabase {
         }
     }
 
-    func planLocked(id: String) throws -> TradePlan? {
+    internal func planLocked(id: String) throws -> TradePlan? {
         var found: TradePlan?
         try connection.query(
             """
@@ -182,11 +182,11 @@ extension TradeGateDatabase {
         return found
     }
 
-    func insertPlan(_ plan: TradePlan) throws {
+    internal func insertPlan(_ plan: TradePlan) throws {
         try connection.run(planInsertSQL, bindings: planBindings(plan))
     }
 
-    func writePlan(_ plan: TradePlan) throws {
+    internal func writePlan(_ plan: TradePlan) throws {
         var bindings = Array(planBindings(plan).dropFirst())
         bindings.append(.text(plan.id))
         try connection.run(
@@ -204,7 +204,7 @@ extension TradeGateDatabase {
         )
     }
 
-    func insertRevision(_ plan: TradePlan, number: Int) throws {
+    internal func insertRevision(_ plan: TradePlan, number: Int) throws {
         let snapshot = try CanonicalJSON.encode(plan)
         try connection.run(
             """
@@ -216,12 +216,12 @@ extension TradeGateDatabase {
                 .text(plan.id),
                 .integer(Int64(number)),
                 .text(Timestamp.string(from: plan.updatedAt)),
-                .text(snapshot)
+                .text(snapshot),
             ]
         )
     }
 
-    func nextRevisionNumber(planID: String) throws -> Int {
+    internal func nextRevisionNumber(planID: String) throws -> Int {
         var number: Int64 = 0
         try connection.query(
             "SELECT COALESCE(MAX(revision_number), 0) FROM plan_revisions WHERE plan_id = ?;",
@@ -270,7 +270,7 @@ private func planBindings(_ plan: TradePlan) -> [SQLiteValue] {
         textBinding(exit?.customExitStrategy),
         textBinding(exit?.plannedExitPrice?.storage),
         textBinding(exit?.exitPositionMode?.rawValue),
-        textBinding(exit?.exitPositionValue?.storage)
+        textBinding(exit?.exitPositionValue?.storage),
     ]
 }
 
@@ -288,7 +288,7 @@ private func readPlan(_ statement: OpaquePointer) throws -> TradePlan {
     var entry: EntryPlanFields?
     var exit: ExitPlanFields?
     if planType == .entry {
-        entry = EntryPlanFields(
+        entry = try EntryPlanFields(
             timeframe: columnText(statement, 8).flatMap(PlanTimeframe.init(rawValue:)),
             majorPullback: columnText(statement, 9).flatMap(MajorPullback.init(rawValue:)),
             mediumPullback: columnText(statement, 10).flatMap(MediumPullback.init(rawValue:)),
@@ -296,19 +296,19 @@ private func readPlan(_ statement: OpaquePointer) throws -> TradePlan {
             smallDivergenceCustom: columnText(statement, 12),
             signalStatus: columnText(statement, 13).flatMap(SignalStatus.init(rawValue:)),
             signalTimeframe: columnText(statement, 14).flatMap(SignalTimeframe.init(rawValue:)),
-            stopPrice: try decimalColumn(statement, 15),
+            stopPrice: decimalColumn(statement, 15),
             positionMode: columnText(statement, 16).flatMap(PositionMode.init(rawValue:)),
-            positionValue: try decimalColumn(statement, 17)
+            positionValue: decimalColumn(statement, 17)
         )
     } else {
-        exit = ExitPlanFields(
+        exit = try ExitPlanFields(
             timeframe: columnText(statement, 8).flatMap(PlanTimeframe.init(rawValue:)),
             secondaryState: columnText(statement, 18).flatMap(ExitSecondaryState.init(rawValue:)),
             exitStrategy: columnText(statement, 19).flatMap(ExitStrategy.init(rawValue:)),
             customExitStrategy: columnText(statement, 20),
-            plannedExitPrice: try decimalColumn(statement, 21),
+            plannedExitPrice: decimalColumn(statement, 21),
             exitPositionMode: columnText(statement, 22).flatMap(ExitPositionMode.init(rawValue:)),
-            exitPositionValue: try decimalColumn(statement, 23)
+            exitPositionValue: decimalColumn(statement, 23)
         )
     }
     return TradePlan(

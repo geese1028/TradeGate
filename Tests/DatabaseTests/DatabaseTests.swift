@@ -23,7 +23,7 @@ import Testing
 
 @Test func revisionsKeepOlderPlans() throws {
     let database = try makeDatabase()
-    var plan = try database.createPlan(try entryPlan())
+    var plan = try database.createPlan(entryPlan())
     plan.entry?.stopPrice = try DecimalValue(parsing: "175")
     plan.entry?.positionValue = try DecimalValue(parsing: "30")
     let updated = try database.updatePlan(plan)
@@ -50,20 +50,20 @@ import Testing
 
 @Test func executionRequiresReviewUntilCompleted() throws {
     let database = try makeDatabase()
-    let plan = try database.createPlan(try entryPlan())
+    let plan = try database.createPlan(entryPlan())
     #expect(try database.pendingReviewCount() == 0)
     let execution = try database.confirmExecution(
         ExecutionInput(
             planID: plan.id,
-            price: try DecimalValue(parsing: "188.30"),
+            price: DecimalValue(parsing: "188.30"),
             positionMode: .percent,
-            positionValue: try DecimalValue(parsing: "30")
+            positionValue: DecimalValue(parsing: "30")
         )
     )
     #expect(execution.reviewRequired)
     #expect(try database.pendingReviewCount() == 1)
     let review = try database.startReview(executionID: execution.id)
-    _ = try database.completeEntryReview(reviewID: review.id, actuals: try entryReview())
+    _ = try database.completeEntryReview(reviewID: review.id, actuals: entryReview())
     #expect(try database.pendingReviewCount() == 0)
     let verification = try database.verifyAuditChain()
     #expect(verification.eventCount > 0)
@@ -71,7 +71,7 @@ import Testing
 
 @Test func noExecutionDoesNotRequireReview() throws {
     let database = try makeDatabase()
-    let plan = try database.createPlan(try entryPlan())
+    let plan = try database.createPlan(entryPlan())
     let closed = try database.recordNoTrade(planID: plan.id, disposition: .noExecution)
     #expect(closed.status == .noExecution)
     #expect(try database.pendingReviewCount() == 0)
@@ -130,9 +130,9 @@ import Testing
         try database.confirmExecution(
             ExecutionInput(
                 planID: "missing",
-                price: try DecimalValue(parsing: "1"),
+                price: DecimalValue(parsing: "1"),
                 positionMode: .quantity,
-                positionValue: try DecimalValue(parsing: "1")
+                positionValue: DecimalValue(parsing: "1")
             )
         )
     }
@@ -140,7 +140,7 @@ import Testing
 
 @Test func reviewQueueSeparatesExitAndEmergency() throws {
     let database = try makeDatabase()
-    var exit = TradePlan(
+    var exit = try TradePlan(
         application: .ibkr,
         symbol: Symbol(raw: "QQQ"),
         planType: .exit,
@@ -148,14 +148,14 @@ import Testing
             timeframe: .oneDay,
             secondaryState: .oneLegUp,
             exitStrategy: .fullExitOnBreak,
-            plannedExitPrice: try DecimalValue(parsing: "500"),
+            plannedExitPrice: DecimalValue(parsing: "500"),
             exitPositionMode: .all
         )
     )
     exit = try database.createPlan(exit)
     _ = try database.confirmExecution(ExecutionInput(
         planID: exit.id,
-        price: try DecimalValue(parsing: "501"),
+        price: DecimalValue(parsing: "501"),
         positionMode: .all
     ))
     _ = try database.recordEmergencyOverride(EmergencyOverrideInput(
@@ -180,12 +180,12 @@ import Testing
             howToAvoidNextTime: "write the plan earlier"
         )
     )
-    #expect(!(try database.reviewQueue().contains { $0.kind == "emergency" }))
+    #expect(try !(database.reviewQueue().contains { $0.kind == "emergency" }))
 }
 
 @Test func exportLeavesTheAuditChainAlone() throws {
     let database = try makeDatabase()
-    _ = try database.createPlan(try entryPlan())
+    _ = try database.createPlan(entryPlan())
     let before = try database.auditEvents().count
     let csv = try database.exportCSV()
     _ = try database.exportDocument()
@@ -195,7 +195,7 @@ import Testing
 }
 
 private func entryPlan() throws -> TradePlan {
-    TradePlan(
+    try TradePlan(
         application: .ibkr,
         symbol: Symbol(raw: "NVDA"),
         planType: .entry,
@@ -206,25 +206,25 @@ private func entryPlan() throws -> TradePlan {
             smallDivergence: .m15,
             signalStatus: .appeared,
             signalTimeframe: .m30,
-            stopPrice: try DecimalValue(parsing: "182.50"),
+            stopPrice: DecimalValue(parsing: "182.50"),
             positionMode: .percent,
-            positionValue: try DecimalValue(parsing: "20")
+            positionValue: DecimalValue(parsing: "20")
         )
     )
 }
 
 private func entryReview() throws -> EntryReviewActuals {
-    EntryReviewActuals(
+    try EntryReviewActuals(
         timeframe: .threeDay,
         majorPullback: .twoLeg,
         mediumPullback: .oneLeg,
         smallDivergence: .m5,
         signalStatus: .appeared,
         signalTimeframe: .m5,
-        stopPrice: try DecimalValue(parsing: "181"),
+        stopPrice: DecimalValue(parsing: "181"),
         positionMode: .percent,
-        positionValue: try DecimalValue(parsing: "30"),
-        executionPrice: try DecimalValue(parsing: "188.30"),
+        positionValue: DecimalValue(parsing: "30"),
+        executionPrice: DecimalValue(parsing: "188.30"),
         adherence: .exact
     )
 }
@@ -248,7 +248,8 @@ private func priceColumnType(path: String) throws -> String {
     defer { sqlite3_finalize(statement) }
     while sqlite3_step(statement) == SQLITE_ROW {
         guard let nameRaw = sqlite3_column_text(statement, 1),
-              let typeRaw = sqlite3_column_text(statement, 2) else {
+              let typeRaw = sqlite3_column_text(statement, 2)
+        else {
             continue
         }
         if String(cString: nameRaw) == "stop_price" {

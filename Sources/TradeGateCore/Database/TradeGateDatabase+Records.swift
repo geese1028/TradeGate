@@ -1,7 +1,7 @@
 import Foundation
 
-extension TradeGateDatabase {
-    public func upsertDevice(_ device: ManagedDevice) throws -> ManagedDevice {
+public extension TradeGateDatabase {
+    func upsertDevice(_ device: ManagedDevice) throws -> ManagedDevice {
         try locked {
             var existingID: String?
             var createdAt: String?
@@ -12,14 +12,14 @@ extension TradeGateDatabase {
                 existingID = columnText(statement, 0)
                 createdAt = columnText(statement, 1)
             }
-            let stored = ManagedDevice(
+            let stored = try ManagedDevice(
                 id: existingID ?? device.id,
                 serialNumber: device.serialNumber,
                 productName: device.productName,
                 firmwareVersion: device.firmwareVersion,
                 managedFIDO2: device.managedFIDO2,
                 managedU2F: device.managedU2F,
-                createdAt: try createdAt.map { try Timestamp.date(from: $0) } ?? device.createdAt,
+                createdAt: createdAt.map { try Timestamp.date(from: $0) } ?? device.createdAt,
                 lastSeenAt: device.lastSeenAt,
                 enabled: device.enabled
             )
@@ -46,14 +46,14 @@ extension TradeGateDatabase {
                     intBinding(stored.managedU2F),
                     .text(Timestamp.string(from: stored.createdAt)),
                     .text(Timestamp.string(from: stored.lastSeenAt)),
-                    intBinding(stored.enabled)
+                    intBinding(stored.enabled),
                 ]
             )
             return stored
         }
     }
 
-    public func device(serialNumber: String) throws -> ManagedDevice? {
+    func device(serialNumber: String) throws -> ManagedDevice? {
         try locked {
             var found: ManagedDevice?
             try connection.query(
@@ -64,15 +64,15 @@ extension TradeGateDatabase {
                 """,
                 bindings: [.text(serialNumber)]
             ) { statement in
-                found = ManagedDevice(
+                found = try ManagedDevice(
                     id: columnText(statement, 0) ?? "",
                     serialNumber: columnText(statement, 1) ?? "",
                     productName: columnText(statement, 2) ?? "",
                     firmwareVersion: columnText(statement, 3) ?? "",
                     managedFIDO2: columnBool(statement, 4),
                     managedU2F: columnBool(statement, 5),
-                    createdAt: try Timestamp.date(from: columnText(statement, 6) ?? ""),
-                    lastSeenAt: try Timestamp.date(from: columnText(statement, 7) ?? ""),
+                    createdAt: Timestamp.date(from: columnText(statement, 6) ?? ""),
+                    lastSeenAt: Timestamp.date(from: columnText(statement, 7) ?? ""),
                     enabled: columnBool(statement, 8)
                 )
             }
@@ -80,7 +80,7 @@ extension TradeGateDatabase {
         }
     }
 
-    public func confirmExecution(_ input: ExecutionInput) throws -> ExecutionRecord {
+    func confirmExecution(_ input: ExecutionInput) throws -> ExecutionRecord {
         if !input.price.isPositive {
             throw TradeGateError.reviewValidation([.priceNotPositive])
         }
@@ -136,7 +136,7 @@ extension TradeGateDatabase {
                         .text(record.executionPositionMode.rawValue),
                         textBinding(record.executionPositionValue?.storage),
                         intBinding(true),
-                        intBinding(true)
+                        intBinding(true),
                     ]
                 )
                 _ = try appendAuditLocked(
@@ -164,7 +164,7 @@ extension TradeGateDatabase {
         }
     }
 
-    public func startReview(executionID: String) throws -> ReviewRecord {
+    func startReview(executionID: String) throws -> ReviewRecord {
         try locked {
             guard try executionExists(executionID) else {
                 throw TradeGateError.notFound(executionID)
@@ -201,7 +201,7 @@ extension TradeGateDatabase {
         }
     }
 
-    public func completeEntryReview(reviewID: String, actuals: EntryReviewActuals) throws -> ReviewRecord {
+    func completeEntryReview(reviewID: String, actuals: EntryReviewActuals) throws -> ReviewRecord {
         let errors = ReviewValidator.validate(entry: actuals)
         guard errors.isEmpty else { throw TradeGateError.reviewValidation(errors) }
         let json = try CanonicalJSON.encode(actuals)
@@ -214,7 +214,7 @@ extension TradeGateDatabase {
         )
     }
 
-    public func completeExitReview(reviewID: String, actuals: ExitReviewActuals) throws -> ReviewRecord {
+    func completeExitReview(reviewID: String, actuals: ExitReviewActuals) throws -> ReviewRecord {
         let errors = ReviewValidator.validate(exit: actuals)
         guard errors.isEmpty else { throw TradeGateError.reviewValidation(errors) }
         let json = try CanonicalJSON.encode(actuals)
@@ -227,7 +227,7 @@ extension TradeGateDatabase {
         )
     }
 
-    public func recordEmergencyOverride(_ input: EmergencyOverrideInput) throws -> EmergencyOverride {
+    func recordEmergencyOverride(_ input: EmergencyOverrideInput) throws -> EmergencyOverride {
         let errors = EmergencyValidator.validate(input)
         guard errors.isEmpty else { throw TradeGateError.emergencyValidation(errors) }
         let createdAt = Date()
@@ -256,7 +256,7 @@ extension TradeGateDatabase {
                         .text(record.symbol.normalized),
                         .text(record.reasonCategory.rawValue),
                         .text(record.reasonText),
-                        .text(Timestamp.string(from: record.createdAt))
+                        .text(Timestamp.string(from: record.createdAt)),
                     ]
                 )
                 _ = try appendAuditLocked(
@@ -291,7 +291,7 @@ extension TradeGateDatabase {
         }
     }
 
-    public func startEmergencyReview(overrideID: String) throws -> ReviewRecord {
+    func startEmergencyReview(overrideID: String) throws -> ReviewRecord {
         try locked {
             guard try emergencyExists(overrideID) else {
                 throw TradeGateError.notFound(overrideID)
@@ -322,7 +322,7 @@ extension TradeGateDatabase {
         }
     }
 
-    public func completeEmergencyReview(reviewID: String, answers: EmergencyReviewAnswers) throws -> ReviewRecord {
+    func completeEmergencyReview(reviewID: String, answers: EmergencyReviewAnswers) throws -> ReviewRecord {
         let errors = ReviewValidator.validate(emergency: answers)
         guard errors.isEmpty else { throw TradeGateError.reviewValidation(errors) }
         let json = try CanonicalJSON.encode(answers)
@@ -335,7 +335,7 @@ extension TradeGateDatabase {
         )
     }
 
-    public func pendingReviewCount() throws -> Int {
+    func pendingReviewCount() throws -> Int {
         try locked {
             var count = 0
             try connection.query(
@@ -362,7 +362,7 @@ extension TradeGateDatabase {
         }
     }
 
-    public func insertUnlockSession(_ session: UnlockSession) throws {
+    func insertUnlockSession(_ session: UnlockSession) throws {
         try locked {
             try connection.run(
                 """
@@ -381,7 +381,7 @@ extension TradeGateDatabase {
                     textBinding(session.unlockedAt.map(Timestamp.string(from:))),
                     textBinding(session.lockedAt.map(Timestamp.string(from:))),
                     session.durationSeconds.map { .integer(Int64($0)) } ?? .null,
-                    .text(session.result.rawValue)
+                    .text(session.result.rawValue),
                 ]
             )
         }
@@ -419,7 +419,7 @@ extension TradeGateDatabase {
                         textBinding(adherence?.rawValue),
                         textBinding(deviationReason),
                         textBinding(notes),
-                        .text(reviewID)
+                        .text(reviewID),
                     ]
                 )
                 _ = try appendAuditLocked(
@@ -453,7 +453,7 @@ extension TradeGateDatabase {
                 .text(review.actualJSON),
                 textBinding(review.planAdherence?.rawValue),
                 textBinding(review.deviationReason),
-                textBinding(review.notes)
+                textBinding(review.notes),
             ]
         )
     }
@@ -468,12 +468,12 @@ extension TradeGateDatabase {
             """,
             bindings: [.text(id)]
         ) { statement in
-            found = ReviewRecord(
+            found = try ReviewRecord(
                 id: columnText(statement, 0) ?? "",
                 executionID: columnText(statement, 1),
                 emergencyOverrideID: columnText(statement, 2),
-                createdAt: try Timestamp.date(from: columnText(statement, 3) ?? ""),
-                completedAt: try columnText(statement, 4).map { try Timestamp.date(from: $0) },
+                createdAt: Timestamp.date(from: columnText(statement, 3) ?? ""),
+                completedAt: columnText(statement, 4).map { try Timestamp.date(from: $0) },
                 actualJSON: columnText(statement, 5) ?? "{}",
                 planAdherence: columnText(statement, 6).flatMap(PlanAdherence.init(rawValue:)),
                 deviationReason: columnText(statement, 7),

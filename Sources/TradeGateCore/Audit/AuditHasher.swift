@@ -131,7 +131,7 @@ public enum AuditHasher {
             "execution_id": executionID ?? NSNull(),
             "review_id": reviewID ?? NSNull(),
             "unlock_session_id": unlockSessionID ?? NSNull(),
-            "metadata_json": metadataJSON
+            "metadata_json": metadataJSON,
         ]
         let data = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
         guard let text = String(data: data, encoding: .utf8) else {

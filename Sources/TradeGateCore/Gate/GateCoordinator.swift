@@ -63,7 +63,7 @@ public actor GateCoordinator {
         state = .locked
         _ = try? database.appendAudit(AuditEventDraft(eventType: .daemonStarted))
         await reconcile(now: Date())
-        if state != .lockStateUnknown && state != .errorFailClosed {
+        if state != .lockStateUnknown, state != .errorFailClosed {
             apply(try? evaluate())
         }
     }
@@ -72,7 +72,7 @@ public actor GateCoordinator {
         await reconcile(now: now)
         let pending = (try? database.pendingReviewCount()) ?? 0
         let today = (try? database.todayUnlockCount(now: now)) ?? 0
-        let devices = (try? await yubiKey.listDevices()) ?? []
+        let devices = await (try? yubiKey.listDevices()) ?? []
         let device = devices.first { $0.serialNumber == managedSerial } ?? devices.first
         let remaining = unlockDeadline.map { max(0, Int($0.timeIntervalSince(now))) }
         return GateSnapshot(
@@ -223,7 +223,9 @@ public actor GateCoordinator {
         state = .locked
     }
 
-    public func currentState() -> GateState { state }
+    public func currentState() -> GateState {
+        state
+    }
 
     private func performUnlock(
         application: TradingApplication,
@@ -285,35 +287,35 @@ public actor GateCoordinator {
             await lockAfterWindow(now: now)
             return
         }
-        let devices = (try? await yubiKey.listDevices()) ?? []
+        let devices = await (try? yubiKey.listDevices()) ?? []
         if managedSerial == nil {
             managedSerial = devices.first(where: \.isManageable)?.serialNumber
         }
         let present = devices.contains { $0.serialNumber == managedSerial }
-        if state == .unlocked && seenDevice && !present {
+        if state == .unlocked, seenDevice, !present {
             warning = "YubiKey 在重新锁定之前被拔出。请重新插入 YubiKey，TradeGate 将立即重新关闭 FIDO。"
             try? transition(.deviceRemovedWhileUnlocked)
             _ = try? database.appendAudit(AuditEventDraft(eventType: .deviceRemovedWhileUnlocked))
             needsExecutionPrompt = false
         }
-        if state == .lockStateUnknown && present {
+        if state == .lockStateUnknown, present {
             try? transition(.deviceInserted)
             _ = try? database.appendAudit(AuditEventDraft(eventType: .deviceInserted, metadata: ["serial": managedSerial ?? ""]))
             await finishLock(confirmedFailure: false)
             try? evaluateAndStore()
         }
-        if present && (state == .locked || state.isIdle) {
-            if let serial = managedSerial, let device = try? await yubiKey.getState(deviceID: serial), device.fidoAvailable, state != .unlocked && state != .unlocking {
+        if present, state == .locked || state.isIdle {
+            if let serial = managedSerial, let device = try? await yubiKey.getState(deviceID: serial), device.fidoAvailable, state != .unlocked, state != .unlocking {
                 try? await yubiKey.lock(deviceID: serial)
             }
         }
-        if !present && state.isIdle {
+        if !present, state.isIdle {
             state = RuleEngine.idleState(facts: (try? currentFacts()) ?? .empty)
         }
-        if present && !seenDevice, let serial = managedSerial {
+        if present, !seenDevice, let serial = managedSerial {
             _ = try? database.appendAudit(AuditEventDraft(eventType: .deviceInserted, metadata: ["serial": serial]))
         }
-        if !present && seenDevice {
+        if !present, seenDevice {
             _ = try? database.appendAudit(AuditEventDraft(eventType: .deviceRemoved))
         }
         seenDevice = present
@@ -346,7 +348,9 @@ public actor GateCoordinator {
     }
 
     private func managedDeviceID() async throws -> String? {
-        if let managedSerial { return managedSerial }
+        if let managedSerial {
+            return managedSerial
+        }
         let devices = try await yubiKey.listDevices()
         guard let device = devices.first(where: \.isManageable) else { return nil }
         managedSerial = device.serialNumber
@@ -370,8 +374,8 @@ public actor GateCoordinator {
 
     private func facts(for plan: TradePlan?) throws -> GateFacts {
         let validation = plan.map(PlanValidator.validate)
-        return GateFacts(
-            pendingReviewCount: try database.pendingReviewCount(),
+        return try GateFacts(
+            pendingReviewCount: database.pendingReviewCount(),
             hasSavablePlan: validation?.canSave == true,
             planType: plan?.planType,
             signalStatus: plan?.entry?.signalStatus,
@@ -395,13 +399,17 @@ public actor GateCoordinator {
     }
 
     private func apply(_ newState: GateState?) {
-        if let newState { state = newState }
+        if let newState {
+            state = newState
+        }
     }
 }
 
 private extension Result where Failure == GateTransitionError {
     var isSuccess: Bool {
-        if case .success = self { return true }
+        if case .success = self {
+            return true
+        }
         return false
     }
 }

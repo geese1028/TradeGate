@@ -92,14 +92,13 @@ final class SQLiteConnection {
     private func bind(_ bindings: [SQLiteValue], to statement: OpaquePointer) throws {
         for (offset, value) in bindings.enumerated() {
             let index = Int32(offset + 1)
-            let rc: Int32
-            switch value {
-            case .text(let text):
-                rc = sqlite3_bind_text(statement, index, text, -1, sqliteTransient)
-            case .integer(let number):
-                rc = sqlite3_bind_int64(statement, index, number)
+            let rc: Int32 = switch value {
+            case let .text(text):
+                sqlite3_bind_text(statement, index, text, -1, sqliteTransient)
+            case let .integer(number):
+                sqlite3_bind_int64(statement, index, number)
             case .null:
-                rc = sqlite3_bind_null(statement, index)
+                sqlite3_bind_null(statement, index)
             }
             guard rc == SQLITE_OK else {
                 throw TradeGateError.sqlite(String(cString: sqlite3_errmsg(handle)))

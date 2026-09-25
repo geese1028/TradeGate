@@ -6,7 +6,7 @@ public struct Symbol: Equatable, Sendable {
 
     public init(raw: String) {
         self.raw = raw
-        self.normalized = raw.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        normalized = raw.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
     }
 
     public var isEmpty: Bool {

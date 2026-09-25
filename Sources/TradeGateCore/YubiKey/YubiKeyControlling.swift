@@ -7,7 +7,9 @@ public struct YubiKeyDevice: Equatable, Sendable, Codable, Identifiable {
     public var fido2Controllable: Bool
     public var u2fControllable: Bool
 
-    public var id: String { serialNumber }
+    public var id: String {
+        serialNumber
+    }
 
     public init(
         serialNumber: String,

@@ -7,7 +7,7 @@ public final class TradeGateDatabase: PlanStoring, AuditVerifying, @unchecked Se
 
     public init(path: String) throws {
         self.path = path
-        self.connection = try SQLiteConnection(path: path)
+        connection = try SQLiteConnection(path: path)
         try migrate()
     }
 

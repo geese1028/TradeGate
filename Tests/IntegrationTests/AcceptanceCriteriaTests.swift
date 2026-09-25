@@ -7,7 +7,7 @@ import Testing
     let harness = try AcceptanceHarness()
     await harness.mock.apply(.unlocked)
     await harness.coordinator.boot()
-    #expect(!(try await harness.mock.getState(deviceID: "111").fidoAvailable))
+    #expect(try await !(harness.mock.getState(deviceID: "111").fidoAvailable))
 }
 
 @Test func ac02ManagedSerialNotEveryInsertedKey() async throws {
@@ -16,7 +16,7 @@ import Testing
     try await harness.coordinator.registerDevice(serial: "111")
     await harness.mock.apply(.unlocked, serialNumber: "222")
     _ = await harness.coordinator.snapshot()
-    #expect(!(try await harness.mock.getState(deviceID: "111").fidoAvailable))
+    #expect(try await !(harness.mock.getState(deviceID: "111").fidoAvailable))
     #expect(try await harness.mock.getState(deviceID: "222").fidoAvailable)
 }
 
@@ -49,18 +49,18 @@ import Testing
     ready.entry?.positionMode = .percent
     ready.entry?.positionValue = try DecimalValue(parsing: "20")
     ready = try await harness.coordinator.updatePlan(ready)
-    let start = Date(timeIntervalSince1970: 10_000)
+    let start = Date(timeIntervalSince1970: 10000)
     try await harness.coordinator.approveAndUnlock(planID: ready.id, now: start)
     #expect(try await harness.mock.getState(deviceID: "111").fidoAvailable)
     await harness.coordinator.expireUnlockWindow(at: start.addingTimeInterval(119))
     #expect(await harness.coordinator.currentState() == .unlocked)
     await harness.coordinator.expireUnlockWindow(at: start.addingTimeInterval(120))
-    #expect(!(try await harness.mock.getState(deviceID: "111").fidoAvailable))
+    #expect(try await !(harness.mock.getState(deviceID: "111").fidoAvailable))
     _ = try await harness.coordinator.confirmExecution(ExecutionInput(
         planID: ready.id,
-        price: try DecimalValue(parsing: "188"),
+        price: DecimalValue(parsing: "188"),
         positionMode: .percent,
-        positionValue: try DecimalValue(parsing: "20")
+        positionValue: DecimalValue(parsing: "20")
     ))
     do {
         try await harness.coordinator.approveAndUnlock(planID: ready.id)
@@ -96,22 +96,22 @@ import Testing
 @Test func ac13And14AuditIsCompleteAndAppendOnly() async throws {
     let harness = try AcceptanceHarness()
     await harness.coordinator.boot()
-    let plan = try await harness.coordinator.createPlan(try entryPlan())
+    let plan = try await harness.coordinator.createPlan(entryPlan())
     try await harness.coordinator.approveAndUnlock(planID: plan.id, now: Date(timeIntervalSince1970: 50))
     await harness.coordinator.expireUnlockWindow(at: Date(timeIntervalSince1970: 200))
     let execution = try await harness.coordinator.confirmExecution(ExecutionInput(
         planID: plan.id,
-        price: try DecimalValue(parsing: "10"),
+        price: DecimalValue(parsing: "10"),
         positionMode: .quantity,
-        positionValue: try DecimalValue(parsing: "1")
+        positionValue: DecimalValue(parsing: "1")
     ))
     let review = try harness.database.startReview(executionID: execution.id)
-    _ = try harness.database.completeEntryReview(reviewID: review.id, actuals: try entryActuals())
-    let types = Set(try harness.database.auditEvents().map(\.eventType))
+    _ = try harness.database.completeEntryReview(reviewID: review.id, actuals: entryActuals())
+    let types = try Set(harness.database.auditEvents().map(\.eventType))
     for required in [
         AuditEventType.planCreated, .planApproved, .unlockRequested, .unlockApproved,
         .yubiKeyUnlocked, .yubiKeyLocked, .executionConfirmed, .reviewRequired,
-        .reviewStarted, .reviewCompleted
+        .reviewStarted, .reviewCompleted,
     ] {
         #expect(types.contains(required))
     }
@@ -154,14 +154,14 @@ private struct AcceptanceHarness {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("tradegate-ac-\(UUID().uuidString).sqlite")
         database = try TradeGateDatabase(path: url.path)
         mock = MockYubiKeyController(devices: [
-            MockYubiKeyController.SimulatedDevice(serialNumber: "111", fido2Enabled: false, u2fEnabled: false)
+            MockYubiKeyController.SimulatedDevice(serialNumber: "111", fido2Enabled: false, u2fEnabled: false),
         ])
         coordinator = GateCoordinator(database: database, yubiKey: mock)
     }
 }
 
 private func entryPlan() throws -> TradePlan {
-    TradePlan(
+    try TradePlan(
         application: .ibkr,
         symbol: Symbol(raw: "NVDA"),
         planType: .entry,
@@ -172,25 +172,25 @@ private func entryPlan() throws -> TradePlan {
             smallDivergence: .m15,
             signalStatus: .appeared,
             signalTimeframe: .h1,
-            stopPrice: try DecimalValue(parsing: "182.50"),
+            stopPrice: DecimalValue(parsing: "182.50"),
             positionMode: .percent,
-            positionValue: try DecimalValue(parsing: "20")
+            positionValue: DecimalValue(parsing: "20")
         )
     )
 }
 
 private func entryActuals() throws -> EntryReviewActuals {
-    EntryReviewActuals(
+    try EntryReviewActuals(
         timeframe: .threeDay,
         majorPullback: .twoLeg,
         mediumPullback: .oneLeg,
         smallDivergence: .m15,
         signalStatus: .appeared,
         signalTimeframe: .h1,
-        stopPrice: try DecimalValue(parsing: "182.5"),
+        stopPrice: DecimalValue(parsing: "182.5"),
         positionMode: .percent,
-        positionValue: try DecimalValue(parsing: "20"),
-        executionPrice: try DecimalValue(parsing: "10"),
+        positionValue: DecimalValue(parsing: "20"),
+        executionPrice: DecimalValue(parsing: "10"),
         adherence: .exact
     )
 }

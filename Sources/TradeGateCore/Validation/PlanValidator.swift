@@ -70,14 +70,22 @@ public enum PlanValidator {
 
     private static func validateEntry(_ entry: EntryPlanFields) -> [PlanValidationError] {
         var errors: [PlanValidationError] = []
-        if entry.timeframe == nil { errors.append(.missingTimeframe) }
-        if entry.majorPullback == nil { errors.append(.missingMajorPullback) }
-        if entry.mediumPullback == nil { errors.append(.missingMediumPullback) }
+        if entry.timeframe == nil {
+            errors.append(.missingTimeframe)
+        }
+        if entry.majorPullback == nil {
+            errors.append(.missingMajorPullback)
+        }
+        if entry.mediumPullback == nil {
+            errors.append(.missingMediumPullback)
+        }
         if entry.smallDivergence == nil {
             errors.append(.missingSmallDivergence)
         } else if entry.smallDivergence == .other {
             let custom = entry.smallDivergenceCustom?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            if custom.isEmpty { errors.append(.missingCustomDivergence) }
+            if custom.isEmpty {
+                errors.append(.missingCustomDivergence)
+            }
         }
         guard let signal = entry.signalStatus else {
             errors.append(.missingSignalStatus)
@@ -86,7 +94,9 @@ public enum PlanValidator {
         guard signal == .appeared else {
             return errors
         }
-        if entry.signalTimeframe == nil { errors.append(.missingSignalTimeframe) }
+        if entry.signalTimeframe == nil {
+            errors.append(.missingSignalTimeframe)
+        }
         if entry.stopPrice == nil {
             errors.append(.missingStopPrice)
         } else if entry.stopPrice?.isPositive != true {
@@ -98,13 +108,19 @@ public enum PlanValidator {
 
     private static func validateExit(_ exit: ExitPlanFields) -> [PlanValidationError] {
         var errors: [PlanValidationError] = []
-        if exit.timeframe == nil { errors.append(.missingTimeframe) }
-        if exit.secondaryState == nil { errors.append(.missingSecondaryState) }
+        if exit.timeframe == nil {
+            errors.append(.missingTimeframe)
+        }
+        if exit.secondaryState == nil {
+            errors.append(.missingSecondaryState)
+        }
         if exit.exitStrategy == nil {
             errors.append(.missingExitStrategy)
         } else if exit.exitStrategy == .custom {
             let custom = exit.customExitStrategy?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            if custom.isEmpty { errors.append(.missingCustomExitStrategy) }
+            if custom.isEmpty {
+                errors.append(.missingCustomExitStrategy)
+            }
         }
         if exit.plannedExitPrice == nil {
             errors.append(.missingPlannedExitPrice)
@@ -135,16 +151,24 @@ public enum PlanValidator {
         case .percent:
             return validatePercent(value)
         case .quantity:
-            if value == nil { return [.missingPosition] }
-            if value?.isPositive != true { return [.positionNotPositive] }
+            if value == nil {
+                return [.missingPosition]
+            }
+            if value?.isPositive != true {
+                return [.positionNotPositive]
+            }
             return []
         }
     }
 
     private static func validatePercent(_ value: DecimalValue?) -> [PlanValidationError] {
         guard let value else { return [.missingPosition] }
-        if !value.isPositive { return [.positionNotPositive] }
-        if value.decimal > 100 { return [.percentOutOfRange] }
+        if !value.isPositive {
+            return [.positionNotPositive]
+        }
+        if value.decimal > 100 {
+            return [.percentOutOfRange]
+        }
         return []
     }
 }

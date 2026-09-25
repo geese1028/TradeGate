@@ -17,12 +17,12 @@ public struct DecimalValue: Equatable, Sendable {
             throw DecimalValueError.invalid
         }
         self.decimal = decimal
-        self.storage = NSDecimalNumber(decimal: decimal).stringValue
+        storage = NSDecimalNumber(decimal: decimal).stringValue
     }
 
     public init(decimal: Decimal) {
         self.decimal = decimal
-        self.storage = NSDecimalNumber(decimal: decimal).stringValue
+        storage = NSDecimalNumber(decimal: decimal).stringValue
     }
 
     public var isPositive: Bool {
@@ -40,7 +40,9 @@ public struct DecimalValue: Equatable, Sendable {
         for character in body {
             if character == "." {
                 dots += 1
-                if dots > 1 { return false }
+                if dots > 1 {
+                    return false
+                }
             } else if !character.isNumber {
                 return false
             }

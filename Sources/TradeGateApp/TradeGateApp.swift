@@ -123,7 +123,9 @@ final class AppModel: ObservableObject {
         }
         lastState = next.state
         snapshot = next
-        if next.state == .reviewRequired { route = route == .home ? .reviewRequired : route }
+        if next.state == .reviewRequired {
+            route = route == .home ? .reviewRequired : route
+        }
     }
 
     @discardableResult
@@ -140,13 +142,27 @@ final class AppModel: ObservableObject {
             )
         }
         await refresh()
-        if let value = decodeEnvelope([TradePlan].self, from: await call("plans")) { plans = value }
-        if let value = decodeEnvelope([JournalEntry].self, from: await call("journal")) { journal = value }
-        if let value = decodeEnvelope([AuditEvent].self, from: await call("audit", auditPayload())) { audit = value }
-        if let value = decodeEnvelope(DashboardStats.self, from: await call("dashboard")) { dashboard = value }
-        if let value = decodeEnvelope([String].self, from: await call("recentSymbols")) { recentSymbols = value }
-        if let value = decodeEnvelope(TradeGateSettings.self, from: await call("settings")) { settings = value }
-        if let value = decodeEnvelope([ReviewWorkItem].self, from: await call("reviewQueue")) { reviewWork = value }
+        if let value = await decodeEnvelope([TradePlan].self, from: call("plans")) {
+            plans = value
+        }
+        if let value = await decodeEnvelope([JournalEntry].self, from: call("journal")) {
+            journal = value
+        }
+        if let value = await decodeEnvelope([AuditEvent].self, from: call("audit", auditPayload())) {
+            audit = value
+        }
+        if let value = await decodeEnvelope(DashboardStats.self, from: call("dashboard")) {
+            dashboard = value
+        }
+        if let value = await decodeEnvelope([String].self, from: call("recentSymbols")) {
+            recentSymbols = value
+        }
+        if let value = await decodeEnvelope(TradeGateSettings.self, from: call("settings")) {
+            settings = value
+        }
+        if let value = await decodeEnvelope([ReviewWorkItem].self, from: call("reviewQueue")) {
+            reviewWork = value
+        }
         return reply
     }
 

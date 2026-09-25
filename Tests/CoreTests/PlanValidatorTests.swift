@@ -79,7 +79,7 @@ import Testing
 
 enum Fixtures {
     static func entryPlan() throws -> TradePlan {
-        TradePlan(
+        try TradePlan(
             application: .ibkr,
             symbol: Symbol(raw: "NVDA"),
             planType: .entry,
@@ -90,25 +90,25 @@ enum Fixtures {
                 smallDivergence: .m15,
                 signalStatus: .appeared,
                 signalTimeframe: .m30,
-                stopPrice: try DecimalValue(parsing: "182.50"),
+                stopPrice: DecimalValue(parsing: "182.50"),
                 positionMode: .percent,
-                positionValue: try DecimalValue(parsing: "20")
+                positionValue: DecimalValue(parsing: "20")
             )
         )
     }
 
     static func entryReview() throws -> EntryReviewActuals {
-        EntryReviewActuals(
+        try EntryReviewActuals(
             timeframe: .threeDay,
             majorPullback: .twoLeg,
             mediumPullback: .oneLeg,
             smallDivergence: .m5,
             signalStatus: .appeared,
             signalTimeframe: .m5,
-            stopPrice: try DecimalValue(parsing: "181"),
+            stopPrice: DecimalValue(parsing: "181"),
             positionMode: .percent,
-            positionValue: try DecimalValue(parsing: "30"),
-            executionPrice: try DecimalValue(parsing: "188.30"),
+            positionValue: DecimalValue(parsing: "30"),
+            executionPrice: DecimalValue(parsing: "188.30"),
             adherence: .exact
         )
     }

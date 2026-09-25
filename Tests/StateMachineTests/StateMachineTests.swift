@@ -50,7 +50,9 @@ import Testing
 
 private extension Result where Failure == GateTransitionError {
     var isIllegal: Bool {
-        if case .failure = self { return true }
+        if case .failure = self {
+            return true
+        }
         return false
     }
 }

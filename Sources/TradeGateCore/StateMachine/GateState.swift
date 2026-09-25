@@ -15,20 +15,20 @@ public enum GateState: String, Codable, Sendable, CaseIterable {
     public var menuSymbol: String {
         switch self {
         case .unlocked, .unlocking:
-            return "🟢"
+            "🟢"
         case .reviewRequired, .errorFailClosed, .lockStateUnknown:
-            return "⚠️"
+            "⚠️"
         case .locked, .planRequired, .signalPending, .ready, .locking:
-            return "🔒"
+            "🔒"
         }
     }
 
     public var isIdle: Bool {
         switch self {
         case .locked, .reviewRequired, .planRequired, .signalPending, .ready:
-            return true
+            true
         case .unlocking, .unlocked, .locking, .errorFailClosed, .lockStateUnknown:
-            return false
+            false
         }
     }
 }
@@ -83,18 +83,18 @@ public enum GateEvent: Equatable, Sendable {
 
     public var name: String {
         switch self {
-        case .evaluate: return "evaluate"
-        case .requestNormalUnlock: return "requestNormalUnlock"
-        case .requestEmergencyUnlock: return "requestEmergencyUnlock"
-        case .unlockSucceeded: return "unlockSucceeded"
-        case .unlockFailed: return "unlockFailed"
-        case .timerFired: return "timerFired"
-        case .deviceRemovedWhileUnlocked: return "deviceRemovedWhileUnlocked"
-        case .deviceInserted: return "deviceInserted"
-        case .lockSucceeded: return "lockSucceeded"
-        case .lockUnconfirmed: return "lockUnconfirmed"
-        case .confirmedLockedFailure: return "confirmedLockedFailure"
-        case .acknowledgeError: return "acknowledgeError"
+        case .evaluate: "evaluate"
+        case .requestNormalUnlock: "requestNormalUnlock"
+        case .requestEmergencyUnlock: "requestEmergencyUnlock"
+        case .unlockSucceeded: "unlockSucceeded"
+        case .unlockFailed: "unlockFailed"
+        case .timerFired: "timerFired"
+        case .deviceRemovedWhileUnlocked: "deviceRemovedWhileUnlocked"
+        case .deviceInserted: "deviceInserted"
+        case .lockSucceeded: "lockSucceeded"
+        case .lockUnconfirmed: "lockUnconfirmed"
+        case .confirmedLockedFailure: "confirmedLockedFailure"
+        case .acknowledgeError: "acknowledgeError"
         }
     }
 }
@@ -154,35 +154,35 @@ public enum GateMachine {
     public static func transition(_ state: GateState, _ event: GateEvent) -> Result<GateState, GateTransitionError> {
         switch (state, event) {
         case let (idle, .evaluate(facts)) where idle.isIdle:
-            return .success(RuleEngine.idleState(facts: facts))
+            .success(RuleEngine.idleState(facts: facts))
         case (.ready, .requestNormalUnlock):
-            return .success(.unlocking)
+            .success(.unlocking)
         case (.locked, .requestEmergencyUnlock),
              (.reviewRequired, .requestEmergencyUnlock),
              (.planRequired, .requestEmergencyUnlock),
              (.signalPending, .requestEmergencyUnlock),
              (.ready, .requestEmergencyUnlock):
-            return .success(.unlocking)
+            .success(.unlocking)
         case (.unlocking, .unlockSucceeded):
-            return .success(.unlocked)
+            .success(.unlocked)
         case (.unlocking, .unlockFailed):
-            return .success(.locking)
+            .success(.locking)
         case (.unlocked, .timerFired):
-            return .success(.locking)
+            .success(.locking)
         case (.unlocked, .deviceRemovedWhileUnlocked):
-            return .success(.lockStateUnknown)
+            .success(.lockStateUnknown)
         case (.lockStateUnknown, .deviceInserted):
-            return .success(.locking)
+            .success(.locking)
         case (.locking, .lockSucceeded):
-            return .success(.locked)
+            .success(.locked)
         case (.locking, .lockUnconfirmed):
-            return .success(.lockStateUnknown)
+            .success(.lockStateUnknown)
         case (.locking, .confirmedLockedFailure):
-            return .success(.errorFailClosed)
+            .success(.errorFailClosed)
         case (.errorFailClosed, .acknowledgeError):
-            return .success(.locked)
+            .success(.locked)
         default:
-            return .failure(.illegal(from: state, event: event.name))
+            .failure(.illegal(from: state, event: event.name))
         }
     }
 }

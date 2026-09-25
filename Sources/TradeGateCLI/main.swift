@@ -3,11 +3,12 @@ import TradeGateCore
 
 let arguments = Array(CommandLine.arguments.dropFirst())
 let joined = arguments.joined(separator: " ")
-if joined.contains("unlock") && joined.contains("--force") {
+if joined.contains("unlock"), joined.contains("--force") {
     fputs("tradegate unlock --force is not available\n", stderr)
     exit(2)
 }
-if joined.contains("review") && joined.contains("--skip") {
+
+if joined.contains("review"), joined.contains("--skip") {
     fputs("tradegate review --skip is not available\n", stderr)
     exit(2)
 }
@@ -22,7 +23,8 @@ case "status":
     let snapshot = xpc(action: "snapshot", payload: "")
     if let data = snapshot.data(using: .utf8),
        let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-       let result = object["result"] as? [String: Any] {
+       let result = object["result"] as? [String: Any]
+    {
         print("TradeGate")
         print("")
         print("State: \(result["state"] as? String ?? "LOCK_STATE_UNKNOWN")")
@@ -75,7 +77,9 @@ case "doctor":
         let reply = xpc(action: "snapshot", payload: "")
         guard reply.contains("yubiKeyPresent") else { throw TradeGateError.invalidState("no key status") }
     }
-    if failures > 0 { exit(1) }
+    if failures > 0 {
+        exit(1)
+    }
     print("doctor ok")
 default:
     fputs("usage: tradegate status | tradegate audit verify | tradegate doctor\n", stderr)

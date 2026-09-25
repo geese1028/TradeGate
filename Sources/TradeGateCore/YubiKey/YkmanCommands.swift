@@ -22,9 +22,9 @@ public enum YkmanCommandBuilder {
             arguments = ["--version"]
         case .list:
             arguments = ["list"]
-        case .info(let serial):
+        case let .info(serial):
             arguments = ["--device", serial, "info"]
-        case .setUSB(let serial, let application, let enabled):
+        case let .setUSB(serial, application, enabled):
             let flag = enabled ? "--enable" : "--disable"
             arguments = ["--device", serial, "config", "usb", flag, application.rawValue]
         }
@@ -109,8 +109,12 @@ public enum YkmanTextParser {
             let text = String(line)
             guard text.uppercased().contains(name.uppercased()) else { continue }
             let lowered = text.lowercased()
-            if lowered.contains("disabled") { return false }
-            if lowered.contains("enabled") { return true }
+            if lowered.contains("disabled") {
+                return false
+            }
+            if lowered.contains("enabled") {
+                return true
+            }
         }
         return false
     }
@@ -119,11 +123,13 @@ public enum YkmanTextParser {
 public enum YkmanPathPolicy {
     public static let trustedPaths = [
         "/opt/homebrew/bin/ykman",
-        "/usr/local/bin/ykman"
+        "/usr/local/bin/ykman",
     ]
 
     public static func validate(path: String, allowUntrusted: Bool) throws {
-        if allowUntrusted { return }
+        if allowUntrusted {
+            return
+        }
         let expanded = (path as NSString).expandingTildeInPath
         guard trustedPaths.contains(expanded) || expanded.contains("/TradeGate.app/Contents/") else {
             throw YubiKeyControlError.untrustedExecutable(path)

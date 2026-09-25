@@ -61,11 +61,17 @@ struct GateRootView: View {
         }
         .padding(20)
         .onChange(of: model.snapshot.needsExecutionPrompt) { needed in
-            if needed { model.route = .executionPrompt }
+            if needed {
+                model.route = .executionPrompt
+            }
         }
         .onChange(of: model.snapshot.state) { state in
-            if state == .unlocked { model.route = .unlocked }
-            if state == .reviewRequired, model.route == .home { model.route = .reviewRequired }
+            if state == .unlocked {
+                model.route = .unlocked
+            }
+            if state == .reviewRequired, model.route == .home {
+                model.route = .reviewRequired
+            }
         }
     }
 }
@@ -82,7 +88,9 @@ struct HomeView: View {
             labeled("YubiKey", model.snapshot.state == .unlocked ? "UNLOCKED" : "LOCKED")
             labeled("待复盘", "\(model.snapshot.pendingReviewCount)")
             labeled("今日解锁", "\(model.snapshot.todayUnlocks)")
-            if let warning = model.snapshot.warning { Text(warning).foregroundStyle(.orange) }
+            if let warning = model.snapshot.warning {
+                Text(warning).foregroundStyle(.orange)
+            }
             Button("开始一次交易计划") { model.route = .chooseApp }
                 .disabled(model.snapshot.pendingReviewCount > 0)
             HStack {
@@ -177,7 +185,10 @@ struct PlanTypeView: View {
 
 struct EntryFormView: View {
     @ObservedObject var model: AppModel
-    var signalAppeared: Bool { model.signalAppeared }
+    var signalAppeared: Bool {
+        model.signalAppeared
+    }
+
     var body: some View {
         Form {
             Picker("交易周期", selection: binding(\.timeframe, PlanTimeframe.threeDay)) {
@@ -227,7 +238,9 @@ struct EntryFormView: View {
         Binding {
             model.draft.entry?[keyPath: keyPath] ?? fallback
         } set: { newValue in
-            if model.draft.entry == nil { model.draft.entry = EntryPlanFields() }
+            if model.draft.entry == nil {
+                model.draft.entry = EntryPlanFields()
+            }
             model.draft.entry?[keyPath: keyPath] = newValue
         }
     }
@@ -269,7 +282,9 @@ struct ExitFormView: View {
                 Text("减仓等待").tag(ExitStrategy.reduceAndWait)
                 Text("自定义").tag(ExitStrategy.custom)
             }
-            if model.draft.exit?.exitStrategy == .custom { TextField("自定义", text: $model.exitCustom) }
+            if model.draft.exit?.exitStrategy == .custom {
+                TextField("自定义", text: $model.exitCustom)
+            }
             TextField("计划离场价格", text: $model.exitPrice)
             Button("确认") {
                 model.draft.exit?.plannedExitPrice = try? DecimalValue(parsing: model.exitPrice)
@@ -287,7 +302,9 @@ struct ExitFormView: View {
         Binding {
             model.draft.exit?[keyPath: keyPath] ?? fallback
         } set: { newValue in
-            if model.draft.exit == nil { model.draft.exit = ExitPlanFields() }
+            if model.draft.exit == nil {
+                model.draft.exit = ExitPlanFields()
+            }
             model.draft.exit?[keyPath: keyPath] = newValue
         }
     }
@@ -421,7 +438,9 @@ struct EntryReviewView: View {
                 Text("有偏差").tag(PlanAdherence.deviation)
                 Text("明显偏离计划").tag(PlanAdherence.significantDeviation)
             }
-            if model.adherence != .exact { TextField("偏离原因", text: $model.deviationReason) }
+            if model.adherence != .exact {
+                TextField("偏离原因", text: $model.deviationReason)
+            }
             Button("完成复盘") { Task { await finishEntryReview(model) } }
         }
     }
@@ -484,7 +503,9 @@ struct ExitReviewView: View {
                 Text("有偏差").tag(PlanAdherence.deviation)
                 Text("明显偏离计划").tag(PlanAdherence.significantDeviation)
             }
-            if model.adherence != .exact { TextField("偏离原因", text: $model.deviationReason) }
+            if model.adherence != .exact {
+                TextField("偏离原因", text: $model.deviationReason)
+            }
             Button("完成出场复盘") { Task { await finishExitReview(model) } }
         }
     }
@@ -530,10 +551,11 @@ struct EmergencyView: View {
                     .disabled(!EmergencyGate.canStartCountdown(reason: model.emergencyReason, phrase: model.emergencyPhrase))
             } else if let armedAt = model.emergencyArmedAt,
                       !EmergencyGate.canConfirm(
-                        armedAt: armedAt,
-                        now: Date(),
-                        countdownSeconds: model.settings.emergencyCountdownSeconds
-                      ) {
+                          armedAt: armedAt,
+                          now: Date(),
+                          countdownSeconds: model.settings.emergencyCountdownSeconds
+                      )
+            {
                 Text("请等待倒计时")
             } else {
                 Button("确认紧急解锁") {
@@ -563,7 +585,7 @@ struct EmergencyReviewView: View {
             Toggle("本次是否本可通过正常流程完成？", isOn: $model.emergencyCouldNormal)
             TextField("下次如何避免？", text: $model.emergencyNext)
             Button("完成紧急复盘") { Task { await finishEmergencyReview(model) } }
-            .disabled(model.emergencyWhy.trimmingCharacters(in: .whitespaces).isEmpty || model.emergencyNext.trimmingCharacters(in: .whitespaces).isEmpty)
+                .disabled(model.emergencyWhy.trimmingCharacters(in: .whitespaces).isEmpty || model.emergencyNext.trimmingCharacters(in: .whitespaces).isEmpty)
         }
     }
 }
@@ -669,14 +691,14 @@ struct TradeDetailView: View {
 
 private func tradeEventTitle(_ type: AuditEventType) -> String {
     switch type {
-    case .planCreated: return "计划创建"
-    case .planUpdated: return "计划修改"
-    case .planApproved: return "计划批准"
-    case .yubiKeyUnlocked: return "YubiKey Unlock"
-    case .executionConfirmed: return "成交"
-    case .reviewCompleted: return "复盘"
-    case .noExecution: return "没有交易"
-    default: return type.rawValue
+    case .planCreated: "计划创建"
+    case .planUpdated: "计划修改"
+    case .planApproved: "计划批准"
+    case .yubiKeyUnlocked: "YubiKey Unlock"
+    case .executionConfirmed: "成交"
+    case .reviewCompleted: "复盘"
+    case .noExecution: "没有交易"
+    default: type.rawValue
     }
 }
 
@@ -687,7 +709,7 @@ struct SettingsView: View {
             Picker("Unlock duration", selection: $model.settings.unlockDurationSeconds) {
                 ForEach(UnlockDuration.allCases, id: \.rawValue) { Text("\($0.rawValue) sec").tag($0.rawValue) }
             }
-            Stepper("Emergency countdown \(model.settings.emergencyCountdownSeconds) sec", value: $model.settings.emergencyCountdownSeconds, in: 5...120)
+            Stepper("Emergency countdown \(model.settings.emergencyCountdownSeconds) sec", value: $model.settings.emergencyCountdownSeconds, in: 5 ... 120)
             Toggle("Start at login", isOn: $model.settings.startAtLogin)
             Toggle("Notification", isOn: $model.settings.notificationsEnabled)
             Text("Database \(TradeGatePaths.databasePath)")
@@ -737,11 +759,10 @@ private func writeExport(_ model: AppModel, name: String, action: String) async 
           let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
           let result = object["result"]
     else { return }
-    let output: Data?
-    if let text = result as? String {
-        output = text.data(using: .utf8)
+    let output: Data? = if let text = result as? String {
+        text.data(using: .utf8)
     } else {
-        output = try? JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys])
+        try? JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys])
     }
     guard let output else { return }
     try? FileManager.default.createDirectory(at: TradeGatePaths.supportDirectory, withIntermediateDirectories: true)
@@ -752,17 +773,17 @@ private func labeled(_ title: String, _ value: String) -> some View {
     HStack { Text(title); Spacer(); Text(value) }
 }
 
-private func json<T: Encodable>(_ value: T) throws -> String {
+private func json(_ value: some Encodable) throws -> String {
     let encoder = JSONEncoder()
     encoder.dateEncodingStrategy = .iso8601
-    return String(data: try encoder.encode(value), encoding: .utf8) ?? ""
+    return try String(data: encoder.encode(value), encoding: .utf8) ?? ""
 }
 
 private struct Envelope<T: Decodable>: Decodable {
     var result: T?
 }
 
-func decodeEnvelope<T: Decodable>(_ type: T.Type, from reply: String) -> T? {
+func decodeEnvelope<T: Decodable>(_: T.Type, from reply: String) -> T? {
     guard let data = reply.data(using: .utf8) else { return nil }
     let decoder = JSONDecoder()
     decoder.dateDecodingStrategy = .iso8601

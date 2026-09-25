@@ -1,6 +1,17 @@
-only_rules:
-  - force_unwrapping
 disabled_rules:
   - line_length
+  - type_body_length
+  - file_length
+  - function_body_length
+  - identifier_name
+  - cyclomatic_complexity
+  - function_parameter_count
+  - large_tuple
+  - nesting
+  - type_name
+  - todo
+  - trailing_comma
+  - opening_brace
 excluded:
   - .build
+  - dist

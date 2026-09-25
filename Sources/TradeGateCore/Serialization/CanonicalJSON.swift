@@ -26,7 +26,7 @@ public enum Timestamp {
 }
 
 public enum CanonicalJSON {
-    public static func encode<T: Encodable>(_ value: T) throws -> String {
+    public static func encode(_ value: some Encodable) throws -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         encoder.dateEncodingStrategy = .custom { date, encoder in
