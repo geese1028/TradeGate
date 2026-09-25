@@ -215,6 +215,26 @@ import Testing
     #expect(!(try await harness.mock.getState(deviceID: "111").fidoAvailable))
 }
 
+@Test func exitPlanUnlocksWithoutAnEntrySignal() async throws {
+    let harness = try AcceptanceHarness()
+    await harness.coordinator.boot()
+    let plan = try await harness.coordinator.createPlan(TradePlan(
+        application: .ibkr,
+        symbol: Symbol(raw: "QQQ"),
+        planType: .exit,
+        exit: ExitPlanFields(
+            timeframe: .oneDay,
+            secondaryState: .topDivergence,
+            exitStrategy: .fullExitOnBreak,
+            plannedExitPrice: try DecimalValue(parsing: "500"),
+            exitPositionMode: .all
+        )
+    ))
+    #expect(await harness.coordinator.currentState() == .ready)
+    try await harness.coordinator.approveAndUnlock(planID: plan.id, now: Date(timeIntervalSince1970: 11_000))
+    #expect(try await harness.mock.getState(deviceID: "111").fidoAvailable)
+}
+
 @Test func unlockWindowUsesTheSavedDuration() async throws {
     let harness = try AcceptanceHarness()
     var settings = try harness.database.settings()
