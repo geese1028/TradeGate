@@ -8,7 +8,10 @@ let package = Package(
         .macOS(.v13)
     ],
     products: [
-        .library(name: "TradeGateCore", targets: ["TradeGateCore"])
+        .library(name: "TradeGateCore", targets: ["TradeGateCore"]),
+        .executable(name: "TradeGateApp", targets: ["TradeGateApp"]),
+        .executable(name: "TradeGateDaemon", targets: ["TradeGateDaemon"]),
+        .executable(name: "tradegate", targets: ["TradeGateCLI"])
     ],
     targets: [
         .target(
@@ -17,6 +20,9 @@ let package = Package(
                 .linkedLibrary("sqlite3")
             ]
         ),
+        .executableTarget(name: "TradeGateApp", dependencies: ["TradeGateCore"]),
+        .executableTarget(name: "TradeGateDaemon", dependencies: ["TradeGateCore"]),
+        .executableTarget(name: "TradeGateCLI", dependencies: ["TradeGateCore"]),
         .testTarget(
             name: "CoreTests",
             dependencies: ["TradeGateCore"]
@@ -27,6 +33,13 @@ let package = Package(
             linkerSettings: [
                 .linkedLibrary("sqlite3")
             ]
+        ),
+        .testTarget(name: "StateMachineTests", dependencies: ["TradeGateCore"]),
+        .testTarget(name: "YubiKeyMockTests", dependencies: ["TradeGateCore"]),
+        .testTarget(
+            name: "IntegrationTests",
+            dependencies: ["TradeGateCore"],
+            linkerSettings: [.linkedLibrary("sqlite3")]
         )
     ]
 )

@@ -1,6 +1,6 @@
 import Foundation
 
-public struct ManagedDevice: Equatable, Sendable, Identifiable {
+public struct ManagedDevice: Equatable, Sendable, Codable, Identifiable {
     public var id: String
     public var serialNumber: String
     public var productName: String
@@ -34,9 +34,9 @@ public struct ManagedDevice: Equatable, Sendable, Identifiable {
     }
 }
 
-public struct ExecutionRecord: Equatable, Sendable, Identifiable {
+public struct ExecutionRecord: Equatable, Sendable, Codable, Identifiable {
     public var id: String
-    public var planID: String
+    public var planID: String?
     public var executedAt: Date
     public var executionPrice: DecimalValue
     public var executionPositionMode: ExecutionPositionMode
@@ -46,7 +46,7 @@ public struct ExecutionRecord: Equatable, Sendable, Identifiable {
 
     public init(
         id: String,
-        planID: String,
+        planID: String?,
         executedAt: Date,
         executionPrice: DecimalValue,
         executionPositionMode: ExecutionPositionMode,
@@ -65,15 +65,15 @@ public struct ExecutionRecord: Equatable, Sendable, Identifiable {
     }
 }
 
-public struct ExecutionInput: Equatable, Sendable {
-    public var planID: String
+public struct ExecutionInput: Equatable, Sendable, Codable {
+    public var planID: String?
     public var executedAt: Date
     public var price: DecimalValue
     public var positionMode: ExecutionPositionMode
     public var positionValue: DecimalValue?
 
     public init(
-        planID: String,
+        planID: String?,
         executedAt: Date = Date(),
         price: DecimalValue,
         positionMode: ExecutionPositionMode,
@@ -87,7 +87,7 @@ public struct ExecutionInput: Equatable, Sendable {
     }
 }
 
-public struct ReviewRecord: Equatable, Sendable, Identifiable {
+public struct ReviewRecord: Equatable, Sendable, Codable, Identifiable {
     public var id: String
     public var executionID: String?
     public var emergencyOverrideID: String?
@@ -229,7 +229,7 @@ public struct EmergencyReviewAnswers: Equatable, Sendable, Codable {
     }
 }
 
-public struct UnlockSession: Equatable, Sendable, Identifiable {
+public struct UnlockSession: Equatable, Sendable, Codable, Identifiable {
     public var id: String
     public var application: TradingApplication
     public var symbol: String
@@ -266,7 +266,7 @@ public struct UnlockSession: Equatable, Sendable, Identifiable {
     }
 }
 
-public struct EmergencyOverride: Equatable, Sendable, Identifiable {
+public struct EmergencyOverride: Equatable, Sendable, Codable, Identifiable {
     public var id: String
     public var application: TradingApplication
     public var symbol: Symbol
@@ -294,7 +294,7 @@ public struct EmergencyOverride: Equatable, Sendable, Identifiable {
     }
 }
 
-public struct EmergencyOverrideInput: Equatable, Sendable {
+public struct EmergencyOverrideInput: Equatable, Sendable, Codable {
     public var application: TradingApplication
     public var symbol: Symbol
     public var reasonCategory: EmergencyReasonCategory
@@ -316,7 +316,7 @@ public struct EmergencyOverrideInput: Equatable, Sendable {
     }
 }
 
-public struct TradeGateSettings: Equatable, Sendable {
+public struct TradeGateSettings: Equatable, Sendable, Codable {
     public var unlockDurationSeconds: Int
     public var emergencyCountdownSeconds: Int
     public var startAtLogin: Bool

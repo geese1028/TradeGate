@@ -99,7 +99,7 @@ public struct TradePlan: Equatable, Sendable, Codable, Identifiable {
     }
 }
 
-public struct PlanRevision: Equatable, Sendable, Identifiable {
+public struct PlanRevision: Equatable, Sendable, Codable, Identifiable {
     public let id: String
     public let planID: String
     public let revisionNumber: Int

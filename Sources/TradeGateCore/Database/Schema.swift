@@ -57,7 +57,7 @@ enum Schema {
 
     CREATE TABLE executions (
         id TEXT PRIMARY KEY NOT NULL,
-        plan_id TEXT NOT NULL REFERENCES trade_plans(id),
+        plan_id TEXT REFERENCES trade_plans(id),
         executed_at TEXT NOT NULL,
         execution_price TEXT NOT NULL,
         execution_position_mode TEXT NOT NULL,

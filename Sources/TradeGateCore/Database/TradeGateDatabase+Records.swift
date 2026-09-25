@@ -103,12 +103,16 @@ extension TradeGateDatabase {
             }
         }
         return try locked {
-            guard let plan = try planLocked(id: input.planID) else {
-                throw TradeGateError.notFound(input.planID)
+            var plan: TradePlan?
+            if let planID = input.planID {
+                guard let found = try planLocked(id: planID) else {
+                    throw TradeGateError.notFound(planID)
+                }
+                plan = found
             }
             let record = ExecutionRecord(
                 id: UUID().uuidString,
-                planID: plan.id,
+                planID: plan?.id,
                 executedAt: input.executedAt,
                 executionPrice: input.price,
                 executionPositionMode: input.positionMode,
@@ -126,7 +130,7 @@ extension TradeGateDatabase {
                     """,
                     bindings: [
                         .text(record.id),
-                        .text(record.planID),
+                        textBinding(record.planID),
                         .text(Timestamp.string(from: record.executedAt)),
                         .text(record.executionPrice.storage),
                         .text(record.executionPositionMode.rawValue),
@@ -138,9 +142,9 @@ extension TradeGateDatabase {
                 _ = try appendAuditLocked(
                     AuditEventDraft(
                         eventType: .executionConfirmed,
-                        application: plan.application,
-                        symbol: plan.symbol.normalized,
-                        planID: plan.id,
+                        application: plan?.application,
+                        symbol: plan?.symbol.normalized,
+                        planID: plan?.id,
                         executionID: record.id,
                         timestamp: record.executedAt
                     )
@@ -148,9 +152,9 @@ extension TradeGateDatabase {
                 _ = try appendAuditLocked(
                     AuditEventDraft(
                         eventType: .reviewRequired,
-                        application: plan.application,
-                        symbol: plan.symbol.normalized,
-                        planID: plan.id,
+                        application: plan?.application,
+                        symbol: plan?.symbol.normalized,
+                        planID: plan?.id,
                         executionID: record.id,
                         timestamp: record.executedAt
                     )

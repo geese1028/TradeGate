@@ -113,7 +113,7 @@ public enum EmergencyReasonCategory: String, Codable, Sendable {
     case other = "OTHER"
 }
 
-public enum NoTradeDisposition: String, Sendable {
+public enum NoTradeDisposition: String, Codable, Sendable {
     case cancelled = "CANCELLED"
     case noExecution = "NO_EXECUTION"
 }

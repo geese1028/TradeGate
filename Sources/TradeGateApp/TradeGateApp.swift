@@ -1,0 +1,196 @@
+import AppKit
+import ServiceManagement
+import SwiftUI
+import TradeGateCore
+import UserNotifications
+
+@main
+struct TradeGateApp: App {
+    @StateObject private var model = AppModel()
+
+    var body: some Scene {
+        MenuBarExtra {
+            MenuBarMenu(model: model)
+        } label: {
+            Text("\(model.snapshot.state.menuSymbol) TradeGate")
+        }
+        Window("TradeGate", id: "gate") {
+            GateRootView(model: model)
+                .frame(minWidth: 460, minHeight: 560)
+        }
+    }
+}
+
+@MainActor
+final class AppModel: ObservableObject {
+    @Published var snapshot = GateSnapshot(
+        state: .lockStateUnknown,
+        pendingReviewCount: 0,
+        todayUnlocks: 0,
+        yubiKeyPresent: false
+    )
+    @Published var route: GateRoute = .home
+    @Published var plans: [TradePlan] = []
+    @Published var journal: [JournalEntry] = []
+    @Published var audit: [AuditEvent] = []
+    @Published var dashboard = DashboardStats(
+        unlockCount: 0, emergencyCount: 0, tradeCount: 0, noExecutionUnlockCount: 0,
+        exactCount: 0, deviationCount: 0, significantDeviationCount: 0,
+        positionDeviationCount: 0, stopDeviationCount: 0, earlyEntryCount: 0
+    )
+    @Published var recentSymbols: [String] = []
+    @Published var settings = TradeGateSettings()
+    @Published var errorText: String?
+    @Published var symbolText = ""
+    @Published var signalAppeared = true
+    @Published var stopText = ""
+    @Published var positionText = "20"
+    @Published var customDivergence = ""
+    @Published var exitPrice = ""
+    @Published var exitCustom = ""
+    @Published var traded = false
+    @Published var fillPrice = ""
+    @Published var fillSize = ""
+    @Published var adherence = PlanAdherence.exact
+    @Published var deviationReason = ""
+    @Published var emergencySymbol = ""
+    @Published var emergencyReason = ""
+    @Published var emergencyPhrase = ""
+    @Published var emergencyCategory = EmergencyReasonCategory.positionRisk
+    @Published var emergencyArmedAt: Date?
+    @Published var emergencyWhy = ""
+    @Published var emergencyNext = ""
+    @Published var draft = TradePlan(application: .ibkr, symbol: Symbol(raw: ""), planType: .entry, entry: EntryPlanFields())
+    private let inProcess: (coordinator: GateCoordinator, database: TradeGateDatabase)?
+    private var lastState: GateState?
+
+    init() {
+        if ProcessInfo.processInfo.arguments.contains("--in-process") {
+            let directory = TradeGatePaths.supportDirectory
+            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let database = (try? TradeGateDatabase(path: TradeGatePaths.databasePath))
+                ?? (try? TradeGateDatabase(path: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("tradegate-app.sqlite").path))
+            if let database {
+                let coordinator = GateCoordinator(database: database, yubiKey: MockYubiKeyController())
+                inProcess = (coordinator, database)
+                Task { await coordinator.boot() }
+            } else {
+                inProcess = nil
+            }
+        } else {
+            inProcess = nil
+            try? SMAppService.daemon(plistName: "com.tradegate.daemon.plist").register()
+        }
+        Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor in await self?.refresh() }
+        }
+        Task { await refresh() }
+    }
+
+    func refresh() async {
+        let reply = await call("snapshot")
+        guard let next = decodeEnvelope(GateSnapshot.self, from: reply) else {
+            snapshot = GateSnapshot(
+                state: .lockStateUnknown,
+                pendingReviewCount: snapshot.pendingReviewCount,
+                todayUnlocks: snapshot.todayUnlocks,
+                yubiKeyPresent: false,
+                warning: "无法连接 TradeGate daemon。FIDO 状态未知。"
+            )
+            return
+        }
+        if let lastState, lastState != next.state {
+            notify(next)
+        }
+        lastState = next.state
+        snapshot = next
+        if next.state == .reviewRequired { route = route == .home ? .reviewRequired : route }
+    }
+
+    @discardableResult
+    func perform(_ action: String, payload: String = "") async -> String {
+        let reply = await call(action, payload)
+        if reply.contains("\"ok\":false") {
+            errorText = reply
+            snapshot = GateSnapshot(
+                state: snapshot.state == .unlocked ? snapshot.state : .errorFailClosed,
+                pendingReviewCount: snapshot.pendingReviewCount,
+                todayUnlocks: snapshot.todayUnlocks,
+                yubiKeyPresent: snapshot.yubiKeyPresent,
+                warning: "操作失败，TradeGate 保持锁定。"
+            )
+        }
+        await refresh()
+        if let value = decodeEnvelope([TradePlan].self, from: await call("plans")) { plans = value }
+        if let value = decodeEnvelope([JournalEntry].self, from: await call("journal")) { journal = value }
+        if let value = decodeEnvelope([AuditEvent].self, from: await call("audit")) { audit = value }
+        if let value = decodeEnvelope(DashboardStats.self, from: await call("dashboard")) { dashboard = value }
+        if let value = decodeEnvelope([String].self, from: await call("recentSymbols")) { recentSymbols = value }
+        if let value = decodeEnvelope(TradeGateSettings.self, from: await call("settings")) { settings = value }
+        return reply
+    }
+
+    private func call(_ action: String, _ payload: String = "") async -> String {
+        if let inProcess {
+            return await GateRouter.perform(
+                coordinator: inProcess.coordinator,
+                database: inProcess.database,
+                action: action,
+                payload: payload
+            )
+        }
+        return await withCheckedContinuation { continuation in
+            let connection = NSXPCConnection(machServiceName: TradeGatePaths.machService, options: .privileged)
+            connection.remoteObjectInterface = NSXPCInterface(with: TradeGateXPC.self)
+            connection.resume()
+            guard let proxy = connection.remoteObjectProxy as? TradeGateXPC else {
+                connection.invalidate()
+                continuation.resume(returning: "")
+                return
+            }
+            proxy.perform(action: action, payload: payload) { reply in
+                connection.invalidate()
+                continuation.resume(returning: reply)
+            }
+        }
+    }
+
+    private func notify(_ snapshot: GateSnapshot) {
+        let content = UNMutableNotificationContent()
+        switch snapshot.state {
+        case .unlocked:
+            content.title = "YubiKey unlocked"
+        case .locked, .planRequired, .signalPending, .ready:
+            content.title = "YubiKey locked"
+        case .reviewRequired:
+            content.title = "Review required"
+        case .lockStateUnknown:
+            content.title = "YubiKey removed before relock"
+        default:
+            return
+        }
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
+    }
+}
+
+enum GateRoute {
+    case home
+    case reviewRequired
+    case chooseApp
+    case symbol
+    case planType
+    case entryForm
+    case exitForm
+    case signalPending
+    case confirm
+    case unlocked
+    case executionPrompt
+    case entryReview
+    case emergency
+    case emergencyReview
+    case journal
+    case audit
+    case settings
+    case onboarding
+}

@@ -8,12 +8,28 @@ TradeGate does not provide financial advice.
 
 No telemetry. No cloud account. No broker credentials. No trading API access. Local SQLite database only.
 
-This repository is at v0.1 Phase 1: the local plan model, SQLite store, and append-only audit hash chain. The menu bar app, launch daemon, and YubiKey control come in later phases.
+TradeGate keeps the FIDO2/U2F applications on a managed YubiKey disabled until a trade plan is approved, then enables them for a short unlock window. It does not reset the key, delete passkeys, or change the PIN. It does not place orders.
 
-## Phase 1
+## Requirements
+
+- macOS Ventura 13 or later
+- Swift 6
+- YubiKey 5 series controllable by `ykman` 5.9 or newer, and older than 6
+- The managed key should be the only second factor on IBKR and Kraken if the friction is going to matter
+
+## Develop
 
 ```sh
-swift test
+./Scripts/test.sh
+swift run TradeGateDaemon
+swift run tradegate status
+swift run TradeGateApp --in-process
 ```
 
-Financial prices are stored as exact decimal strings. Audit events can be inserted, and database triggers reject updates and deletes of `audit_events`.
+`--in-process` uses a mock key so the menu bar can be exercised without hardware. The normal app talks to `TradeGateDaemon` over XPC and does not call `ykman`.
+
+Hardware tests that toggle a real key are off unless `TRADEGATE_HARDWARE_TEST=1`. They never reset a key.
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE).

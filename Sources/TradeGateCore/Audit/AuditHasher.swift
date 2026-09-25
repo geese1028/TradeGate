@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 
-public struct AuditEvent: Equatable, Sendable, Identifiable {
+public struct AuditEvent: Equatable, Sendable, Codable, Identifiable {
     public var id: String
     public var timestamp: Date
     public var eventType: AuditEventType
@@ -81,7 +81,7 @@ public struct AuditEventDraft: Equatable, Sendable {
     }
 }
 
-public struct AuditVerification: Equatable, Sendable {
+public struct AuditVerification: Equatable, Sendable, Codable {
     public var eventCount: Int
     public var headHash: String?
 

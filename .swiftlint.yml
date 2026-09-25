@@ -1,0 +1,6 @@
+only_rules:
+  - force_unwrapping
+disabled_rules:
+  - line_length
+excluded:
+  - .build
