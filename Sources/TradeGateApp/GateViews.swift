@@ -345,9 +345,23 @@ struct ConfirmPlanView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("\(model.draft.application.rawValue.uppercased()) / \(model.draft.symbol.normalized)")
             Text(model.draft.planType == .entry ? "ENTRY PLAN" : "EXIT PLAN")
-            Text("运行级别 \(model.draft.entry?.timeframe?.rawValue ?? model.draft.exit?.timeframe?.rawValue ?? "")")
-            Text("止损 \(model.draft.entry?.stopPrice?.storage ?? "-")")
-            Text("计划仓位 \(model.draft.entry?.positionValue?.storage ?? "")%")
+            if let entry = model.draft.entry {
+                Text("运行级别 \(entry.timeframe?.rawValue ?? "-")")
+                Text("运行级回调 \(entry.majorPullback?.rawValue ?? "-")")
+                Text("中周期回调 \(entry.mediumPullback?.rawValue ?? "-")")
+                Text("底背离 \(entry.smallDivergence?.rawValue ?? "-")")
+                Text("进场信号 \(entry.signalStatus == .appeared ? "已出现" : "未出现")")
+                Text("信号级别 \(entry.signalTimeframe?.rawValue ?? "-")")
+                Text("止损 \(entry.stopPrice?.storage ?? "-")")
+                Text("计划仓位 \(entry.positionValue?.storage ?? "-") \(entry.positionMode?.rawValue ?? "")")
+            }
+            if let exit = model.draft.exit {
+                Text("运行级别 \(exit.timeframe?.rawValue ?? "-")")
+                Text("次级运行状态 \(exit.secondaryState?.rawValue ?? "-")")
+                Text("离场计划 \(exit.exitStrategy?.rawValue ?? "-")")
+                Text("离场价格 \(exit.plannedExitPrice?.storage ?? "-")")
+                Text("离场仓位 \(exit.exitPositionMode?.rawValue ?? "-") \(exit.exitPositionValue?.storage ?? "")")
+            }
             Button("批准并请求解锁") {
                 Task {
                     let id = model.snapshot.activePlanID ?? model.draft.id
