@@ -20,6 +20,51 @@ import Testing
     }
 }
 
+@Test func ykmanSixStaysFailClosed() async throws {
+    let selection = await YubiKeyBackend.select(
+        environment: [
+            "TRADEGATE_YKMAN": "/tmp/ykman",
+            "TRADEGATE_DEV_YKMAN": "1",
+        ],
+        runner: { _, arguments in
+            if arguments == ["--version"] {
+                return "YubiKey Manager (ykman) version: 6.0.0"
+            }
+            return ""
+        }
+    )
+    #expect(selection.warning != nil)
+}
+
+@Test func supportedYkmanUnlockOnlyEnablesFIDO() async throws {
+    let recorder = YkmanCallRecorder()
+    let selection = await YubiKeyBackend.select(
+        environment: [
+            "TRADEGATE_YKMAN": "/tmp/ykman",
+            "TRADEGATE_DEV_YKMAN": "1",
+        ],
+        runner: { _, arguments in
+            recorder.record(arguments)
+            if arguments == ["--version"] {
+                return "YubiKey Manager (ykman) version: 5.9.0"
+            }
+            if arguments.contains("list") {
+                return "YubiKey 5C NFC (5.7.1) [FIDO] Serial: 42\n"
+            }
+            if arguments.contains("info") {
+                return "FIDO U2F        Enabled\nFIDO2           Enabled\n"
+            }
+            return ""
+        }
+    )
+    #expect(selection.warning == nil)
+    try await selection.controller.unlock(deviceID: "42")
+    let calls = recorder.calls
+    #expect(calls.contains(["--device", "42", "config", "usb", "--enable", "FIDO2"]))
+    #expect(calls.contains(["--device", "42", "config", "usb", "--enable", "U2F"]))
+    #expect(calls.allSatisfy { !$0.joined(separator: " ").lowercased().contains("reset") })
+}
+
 @Test func missingYkmanStaysFailClosed() async throws {
     let selection = await YubiKeyBackend.select(environment: ["TRADEGATE_YKMAN": "/tmp/tradegate-missing-ykman"])
     #expect(selection.warning != nil)
