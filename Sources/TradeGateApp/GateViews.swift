@@ -233,7 +233,11 @@ struct EntryFormView: View {
                     Text("1H").tag(SignalTimeframe.h1)
                 }
                 TextField("止损价格", text: $model.stopText)
-                TextField("计划仓位 %", text: $model.positionText)
+                Picker("计划仓位", selection: $model.entryPositionMode) {
+                    Text("账户比例").tag(PositionMode.percent)
+                    Text("数量").tag(PositionMode.quantity)
+                }
+                TextField(model.entryPositionMode == .percent ? "百分比" : "Shares / Units", text: $model.positionText)
             }
             Button("保存计划") { Task { await save() } }
         }
@@ -255,7 +259,7 @@ struct EntryFormView: View {
         model.draft.entry?.smallDivergenceCustom = model.customDivergence
         if model.signalAppeared {
             model.draft.entry?.stopPrice = try? DecimalValue(parsing: model.stopText)
-            model.draft.entry?.positionMode = .percent
+            model.draft.entry?.positionMode = model.entryPositionMode
             model.draft.entry?.positionValue = try? DecimalValue(parsing: model.positionText)
         } else {
             model.draft.entry?.signalTimeframe = nil
@@ -290,10 +294,19 @@ struct ExitFormView: View {
                 TextField("自定义", text: $model.exitCustom)
             }
             TextField("计划离场价格", text: $model.exitPrice)
+            Picker("计划离场仓位", selection: $model.exitPositionMode) {
+                Text("全部").tag(ExitPositionMode.all)
+                Text("百分比").tag(ExitPositionMode.percent)
+                Text("数量").tag(ExitPositionMode.quantity)
+            }
+            if model.exitPositionMode != .all {
+                TextField(model.exitPositionMode == .percent ? "百分比" : "Shares / Units", text: $model.exitPositionText)
+            }
             Button("确认") {
                 model.draft.exit?.plannedExitPrice = try? DecimalValue(parsing: model.exitPrice)
                 model.draft.exit?.customExitStrategy = model.exitCustom
-                model.draft.exit?.exitPositionMode = .all
+                model.draft.exit?.exitPositionMode = model.exitPositionMode
+                model.draft.exit?.exitPositionValue = model.exitPositionMode == .all ? nil : (try? DecimalValue(parsing: model.exitPositionText))
                 Task {
                     guard await model.saveDraft() else { return }
                     model.route = .confirm

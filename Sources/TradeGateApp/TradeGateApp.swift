@@ -45,6 +45,9 @@ final class AppModel: ObservableObject {
     @Published var signalAppeared = true
     @Published var stopText = ""
     @Published var positionText = "20"
+    @Published var entryPositionMode = PositionMode.percent
+    @Published var exitPositionMode = ExitPositionMode.all
+    @Published var exitPositionText = ""
     @Published var customDivergence = ""
     @Published var exitPrice = ""
     @Published var exitCustom = ""
@@ -176,6 +179,9 @@ final class AppModel: ObservableObject {
         signalAppeared = true
         stopText = ""
         positionText = "20"
+        entryPositionMode = .percent
+        exitPositionMode = .all
+        exitPositionText = ""
         symbolText = ""
         route = .chooseApp
     }
