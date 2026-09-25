@@ -552,6 +552,16 @@ struct ExecutionPromptView: View {
                         }
                     }
                     .aquaSecondary(fills: true)
+                    Button("取消这次计划") {
+                        Task {
+                            let id = model.snapshot.activePlanID ?? model.draft.id
+                            let reply = await model.perform("noTrade", payload: #"{"id":"\#(id)","disposition":"CANCELLED"}"#)
+                            if reply.contains("\"ok\":true") {
+                                model.route = .home
+                            }
+                        }
+                    }
+                    .aquaSecondary(fills: true)
                     Button("已成交") { model.beginExecutionReport() }
                         .aquaPrimary(fills: true)
                 } else {
