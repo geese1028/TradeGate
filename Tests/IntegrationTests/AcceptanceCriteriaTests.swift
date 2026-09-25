@@ -190,6 +190,50 @@ import Testing
     #expect(!(try await harness.mock.getState(deviceID: "111").fidoAvailable))
 }
 
+@Test func signalAppearedUpdatesTheSavedPlan() async throws {
+    let harness = try AcceptanceHarness()
+    await harness.coordinator.boot()
+    var plan = try entryPlan()
+    plan.entry?.signalStatus = .notAppeared
+    plan.entry?.signalTimeframe = nil
+    plan.entry?.stopPrice = nil
+    plan.entry?.positionMode = nil
+    plan.entry?.positionValue = nil
+    let encoder = JSONEncoder()
+    encoder.dateEncodingStrategy = .iso8601
+    let waiting = String(data: try encoder.encode(plan), encoding: .utf8) ?? ""
+    let created = await GateRouter.perform(
+        coordinator: harness.coordinator,
+        database: harness.database,
+        action: "createPlan",
+        payload: waiting
+    )
+    #expect(created.contains("\"ok\":true"))
+    let duplicate = await GateRouter.perform(
+        coordinator: harness.coordinator,
+        database: harness.database,
+        action: "createPlan",
+        payload: waiting
+    )
+    #expect(duplicate.contains("\"ok\":false"))
+    plan.entry?.signalStatus = .appeared
+    plan.entry?.signalTimeframe = .m30
+    plan.entry?.stopPrice = try DecimalValue(parsing: "10")
+    plan.entry?.positionMode = .quantity
+    plan.entry?.positionValue = try DecimalValue(parsing: "1")
+    let appeared = String(data: try encoder.encode(plan), encoding: .utf8) ?? ""
+    let updated = await GateRouter.perform(
+        coordinator: harness.coordinator,
+        database: harness.database,
+        action: "updatePlan",
+        payload: appeared
+    )
+    #expect(updated.contains("\"ok\":true"))
+    #expect(try harness.database.listPlans().count == 1)
+    try await harness.coordinator.approveAndUnlock(planID: plan.id)
+    #expect(try await harness.mock.getState(deviceID: "111").fidoAvailable)
+}
+
 @Test func ac16SourcesDoNotUseNetwork() throws {
     let root = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
