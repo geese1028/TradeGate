@@ -134,14 +134,29 @@ public enum YkmanPathPolicy {
         guard trustedPaths.contains(expanded) || expanded.contains("/TradeGate.app/Contents/") else {
             throw YubiKeyControlError.untrustedExecutable(path)
         }
-        let attributes = try FileManager.default.attributesOfItem(atPath: expanded)
-        let owner = attributes[.ownerAccountID] as? NSNumber
-        let permissions = attributes[.posixPermissions] as? NSNumber
-        if owner?.uint32Value != 0 {
-            throw YubiKeyControlError.untrustedExecutable("owner is not root")
-        }
-        if let mode = permissions?.uint16Value, mode & 0o022 != 0 {
+        _ = try spawnUID(executable: expanded)
+    }
+
+    public static func spawnUID(executable: String, euid: UInt32 = UInt32(geteuid())) throws -> UInt32 {
+        let attributes = try FileManager.default.attributesOfItem(atPath: executable)
+        let owner = (attributes[.ownerAccountID] as? NSNumber)?.uint32Value ?? euid
+        let mode = (attributes[.posixPermissions] as? NSNumber)?.uint16Value ?? 0
+        if mode & 0o022 != 0 {
             throw YubiKeyControlError.untrustedExecutable("executable is writable by group or others")
         }
+        if euid == 0, owner != 0 {
+            return owner
+        }
+        return euid
+    }
+
+    public static func spawnUID(owner: UInt32, mode: UInt16, euid: UInt32) throws -> UInt32 {
+        if mode & 0o022 != 0 {
+            throw YubiKeyControlError.untrustedExecutable("executable is writable by group or others")
+        }
+        if euid == 0, owner != 0 {
+            return owner
+        }
+        return euid
     }
 }

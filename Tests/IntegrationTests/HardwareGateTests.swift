@@ -2,6 +2,14 @@ import Foundation
 import Testing
 @testable import TradeGateCore
 
+@Test func installedYkmanPassesTheProductionPathCheck() async throws {
+    let path = "/opt/homebrew/bin/ykman"
+    guard FileManager.default.isExecutableFile(atPath: path) else { return }
+    try YkmanPathPolicy.validate(path: path, allowUntrusted: false)
+    let controller = try YkmanCLIController(executable: path)
+    _ = try await controller.listDevices()
+}
+
 @Test func hardwareTestStaysOffUnlessRequested() async throws {
     guard ProcessInfo.processInfo.environment["TRADEGATE_HARDWARE_TEST"] == "1" else {
         return

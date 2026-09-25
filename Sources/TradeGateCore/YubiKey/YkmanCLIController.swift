@@ -1,4 +1,8 @@
+import Darwin
 import Foundation
+
+@_silgen_name("posix_spawnattr_set_uid_np")
+private func posix_spawnattr_set_uid_np(_ attr: UnsafeMutablePointer<posix_spawnattr_t?>, _ uid: uid_t) -> Int32
 
 public actor YkmanCLIController: YubiKeyControlling {
     public typealias Runner = @Sendable (String, [String]) throws -> String
@@ -53,6 +57,10 @@ public actor YkmanCLIController: YubiKeyControlling {
 
     public static func processRunner(executable: String, arguments: [String]) throws -> String {
         try YkmanCommandBuilder.validate(arguments)
+        let uid = try YkmanPathPolicy.spawnUID(executable: executable)
+        if uid != getuid() {
+            return try spawn(executable: executable, arguments: arguments, uid: uid)
+        }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
@@ -68,5 +76,65 @@ public actor YkmanCLIController: YubiKeyControlling {
             throw YubiKeyControlError.failed(stderr.isEmpty ? stdout : stderr)
         }
         return stdout + stderr
+    }
+
+    private static func spawn(executable: String, arguments: [String], uid: UInt32) throws -> String {
+        var outPipe: [Int32] = [0, 0]
+        var errPipe: [Int32] = [0, 0]
+        guard pipe(&outPipe) == 0, pipe(&errPipe) == 0 else {
+            throw YubiKeyControlError.failed("pipe")
+        }
+        var attr: posix_spawnattr_t?
+        posix_spawnattr_init(&attr)
+        defer { posix_spawnattr_destroy(&attr) }
+        guard posix_spawnattr_set_uid_np(&attr, uid) == 0 else {
+            throw YubiKeyControlError.failed("spawn uid")
+        }
+        var actions: posix_spawn_file_actions_t?
+        posix_spawn_file_actions_init(&actions)
+        defer { posix_spawn_file_actions_destroy(&actions) }
+        posix_spawn_file_actions_adddup2(&actions, outPipe[1], STDOUT_FILENO)
+        posix_spawn_file_actions_adddup2(&actions, errPipe[1], STDERR_FILENO)
+        posix_spawn_file_actions_addclose(&actions, outPipe[0])
+        posix_spawn_file_actions_addclose(&actions, errPipe[0])
+        posix_spawn_file_actions_addclose(&actions, outPipe[1])
+        posix_spawn_file_actions_addclose(&actions, errPipe[1])
+        let argv = ([executable] + arguments).map { strdup($0) }
+        defer { argv.forEach { free($0) } }
+        var cargs: [UnsafeMutablePointer<CChar>?] = argv.map { $0 } + [nil]
+        var pid: pid_t = 0
+        let rc = posix_spawn(&pid, executable, &actions, &attr, &cargs, environ)
+        close(outPipe[1])
+        close(errPipe[1])
+        guard rc == 0 else {
+            close(outPipe[0])
+            close(errPipe[0])
+            throw YubiKeyControlError.failed("posix_spawn \(rc)")
+        }
+        let stdout = String(data: Data(reading: outPipe[0]), encoding: .utf8) ?? ""
+        let stderr = String(data: Data(reading: errPipe[0]), encoding: .utf8) ?? ""
+        var status: Int32 = 0
+        waitpid(pid, &status, 0)
+        let code = (status & 0x7f) == 0 ? (status >> 8) & 0xff : status
+        guard code == 0 else {
+            throw YubiKeyControlError.failed(stderr.isEmpty ? stdout : stderr)
+        }
+        return stdout + stderr
+    }
+}
+
+private extension Data {
+    init(reading fd: Int32) {
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 4096)
+        while true {
+            let count = read(fd, &buffer, buffer.count)
+            if count <= 0 {
+                break
+            }
+            data.append(buffer, count: count)
+        }
+        close(fd)
+        self = data
     }
 }

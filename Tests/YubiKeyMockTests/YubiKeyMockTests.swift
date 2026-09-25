@@ -163,6 +163,11 @@ import Testing
         try YkmanPathPolicy.validate(path: "/tmp/ykman", allowUntrusted: false)
     }
     try YkmanPathPolicy.validate(path: "/tmp/ykman", allowUntrusted: true)
+    #expect(try YkmanPathPolicy.spawnUID(owner: 501, mode: 0o755, euid: 0) == 501)
+    #expect(try YkmanPathPolicy.spawnUID(owner: 0, mode: 0o755, euid: 0) == 0)
+    #expect(throws: YubiKeyControlError.self) {
+        try YkmanPathPolicy.spawnUID(owner: 0, mode: 0o777, euid: 0)
+    }
 }
 
 @Test func simulatedYkmanLockOnlyTogglesFIDO() async throws {
