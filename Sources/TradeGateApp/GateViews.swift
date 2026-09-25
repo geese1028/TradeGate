@@ -522,8 +522,10 @@ private func finishEntryReview(_ model: AppModel) async {
         adherence: model.adherence,
         deviationReason: model.deviationReason
     )
-    await model.perform("completeEntryReview", payload: (try? json(EntryReviewPayload(reviewID: review.id, actuals: actuals))) ?? "")
-    model.route = .home
+    let reply = await model.perform("completeEntryReview", payload: (try? json(EntryReviewPayload(reviewID: review.id, actuals: actuals))) ?? "")
+    if reply.contains("\"ok\":true") {
+        model.route = .home
+    }
 }
 
 struct ExitReviewView: View {
@@ -580,8 +582,10 @@ private func finishExitReview(_ model: AppModel) async {
         adherence: model.adherence,
         deviationReason: model.deviationReason
     )
-    await model.perform("completeExitReview", payload: (try? json(ExitReviewPayload(reviewID: review.id, actuals: actuals))) ?? "")
-    model.route = .home
+    let reply = await model.perform("completeExitReview", payload: (try? json(ExitReviewPayload(reviewID: review.id, actuals: actuals))) ?? "")
+    if reply.contains("\"ok\":true") {
+        model.route = .home
+    }
 }
 
 struct EmergencyView: View {
@@ -656,11 +660,13 @@ private func finishEmergencyReview(_ model: AppModel) async {
         couldHaveUsedNormalFlow: model.emergencyCouldNormal,
         howToAvoidNextTime: model.emergencyNext
     )
-    await model.perform(
+    let reply = await model.perform(
         "completeEmergencyReview",
         payload: (try? json(EmergencyReviewPayload(reviewID: review.id, answers: answers))) ?? ""
     )
-    model.route = .home
+    if reply.contains("\"ok\":true") {
+        model.route = .home
+    }
 }
 
 struct DashboardView: View {
@@ -812,9 +818,12 @@ struct OnboardingView: View {
             Button("测试 LOCK / UNLOCK / LOCK") {
                 Task {
                     let serial = model.snapshot.yubiKeySerial ?? "12345678"
-                    await model.perform("register", payload: #"{"id":"\#(serial)"}"#)
-                    await model.perform("onboardingCycle", payload: #"{"id":"\#(serial)"}"#)
-                    model.route = .home
+                    let registered = await model.perform("register", payload: #"{"id":"\#(serial)"}"#)
+                    guard registered.contains("\"ok\":true") else { return }
+                    let cycled = await model.perform("onboardingCycle", payload: #"{"id":"\#(serial)"}"#)
+                    if cycled.contains("\"ok\":true") {
+                        model.route = .home
+                    }
                 }
             }
         }
