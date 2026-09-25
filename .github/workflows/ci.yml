@@ -11,6 +11,8 @@ jobs:
         run: swift test
       - name: Daemon stays up without the app
         run: ./Scripts/check-daemon.sh
+      - name: CLI refuses unlock bypasses
+        run: ./Scripts/check-cli.sh
       - name: SwiftFormat
         run: |
           brew install swiftformat
