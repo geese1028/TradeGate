@@ -190,6 +190,31 @@ import Testing
     #expect(!(try await harness.mock.getState(deviceID: "111").fidoAvailable))
 }
 
+@Test func pendingReviewBlocksADifferentSymbol() async throws {
+    let harness = try AcceptanceHarness()
+    await harness.coordinator.boot()
+    let nvda = try await harness.coordinator.createPlan(entryPlan())
+    try await harness.coordinator.approveAndUnlock(planID: nvda.id, now: Date(timeIntervalSince1970: 9_000))
+    await harness.coordinator.expireUnlockWindow(at: Date(timeIntervalSince1970: 9_200))
+    _ = try await harness.coordinator.confirmExecution(ExecutionInput(
+        planID: nvda.id,
+        price: try DecimalValue(parsing: "10"),
+        positionMode: .quantity,
+        positionValue: try DecimalValue(parsing: "1")
+    ))
+    var btc = try entryPlan()
+    btc.application = .kraken
+    btc.symbol = Symbol(raw: "BTC")
+    btc = try await harness.coordinator.createPlan(btc)
+    do {
+        try await harness.coordinator.approveAndUnlock(planID: btc.id)
+        #expect(Bool(false))
+    } catch let denial as UnlockDenial {
+        #expect(denial == .reviewRequired)
+    }
+    #expect(!(try await harness.mock.getState(deviceID: "111").fidoAvailable))
+}
+
 @Test func unlockWindowUsesTheSavedDuration() async throws {
     let harness = try AcceptanceHarness()
     var settings = try harness.database.settings()
