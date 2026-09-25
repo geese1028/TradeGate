@@ -171,6 +171,9 @@ import Testing
     let types = try harness.database.auditEvents().map(\.eventType)
     #expect(types.contains(.helperError))
     #expect(types.contains(.planSubmitted))
+    let cancelled = try await harness.coordinator.recordNoTrade(planID: plan.id, disposition: .cancelled)
+    #expect(cancelled.status == .cancelled)
+    #expect(try harness.database.auditEvents().map(\.eventType).contains(.planCancelled))
 }
 
 @Test func ac16SourcesDoNotUseNetwork() throws {

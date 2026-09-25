@@ -334,7 +334,7 @@ struct ConfirmPlanView: View {
             Text("计划仓位 \(model.draft.entry?.positionValue?.storage ?? "")%")
             Button("批准并请求解锁") {
                 Task {
-                    guard let id = model.plans.first?.id ?? model.snapshot.activePlanID else { return }
+                    let id = model.snapshot.activePlanID ?? model.draft.id
                     await model.perform("approve", payload: #"{"id":"\#(id)"}"#)
                 }
             }

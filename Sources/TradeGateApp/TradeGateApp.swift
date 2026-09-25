@@ -232,6 +232,7 @@ final class AppModel: ObservableObject {
     }
 
     private func notify(_ snapshot: GateSnapshot) {
+        guard settings.notificationsEnabled else { return }
         let content = UNMutableNotificationContent()
         switch snapshot.state {
         case .unlocked:
