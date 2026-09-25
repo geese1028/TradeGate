@@ -141,14 +141,9 @@ final class AppModel: ObservableObject {
     func perform(_ action: String, payload: String = "") async -> String {
         let reply = await call(action, payload)
         if reply.contains("\"ok\":false") {
-            errorText = reply
-            snapshot = GateSnapshot(
-                state: snapshot.state == .unlocked ? snapshot.state : .errorFailClosed,
-                pendingReviewCount: snapshot.pendingReviewCount,
-                todayUnlocks: snapshot.todayUnlocks,
-                yubiKeyPresent: snapshot.yubiKeyPresent,
-                warning: "操作失败，TradeGate 保持锁定。"
-            )
+            errorText = readableError(in: reply)
+        } else if !reply.isEmpty {
+            errorText = nil
         }
         await refresh()
         if let value = await decodeEnvelope([TradePlan].self, from: call("plans")) {
@@ -265,6 +260,16 @@ final class AppModel: ObservableObject {
                 continuation.resume(returning: reply)
             }
         }
+    }
+
+    private func readableError(in reply: String) -> String {
+        guard let data = reply.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let error = object["error"] as? String
+        else {
+            return "操作没有完成。"
+        }
+        return error
     }
 
     private func notify(_ snapshot: GateSnapshot) {

@@ -65,6 +65,18 @@ struct GateRootView: View {
             }
         }
         .padding(20)
+        .safeAreaInset(edge: .bottom) {
+            if let errorText = model.errorText {
+                HStack {
+                    Text(errorText)
+                        .font(.callout)
+                        .foregroundStyle(.red)
+                    Spacer()
+                    Button("关闭") { model.errorText = nil }
+                }
+                .padding(8)
+            }
+        }
         .onChange(of: model.snapshot.needsExecutionPrompt) { needed in
             if needed {
                 model.route = .executionPrompt
