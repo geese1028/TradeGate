@@ -556,6 +556,15 @@ struct ExitReviewView: View {
             }
             Text("离场价格 \(plan?.plannedExitPrice?.storage ?? "-")")
             TextField("实际离场价格", text: $model.actualExitPrice)
+            Text("离场仓位 \(plan?.exitPositionMode?.rawValue ?? "ALL") \(plan?.exitPositionValue?.storage ?? "")")
+            Picker("实际离场仓位", selection: $model.actualExitPositionMode) {
+                Text("全部").tag(ExitPositionMode.all)
+                Text("百分比").tag(ExitPositionMode.percent)
+                Text("数量").tag(ExitPositionMode.quantity)
+            }
+            if model.actualExitPositionMode != .all {
+                TextField("实际仓位", text: $model.actualExitPositionText)
+            }
             Text("离场仓位 \(plan?.exitPositionMode?.rawValue ?? "ALL")")
             Picker("是否按计划执行", selection: $model.adherence) {
                 Text("完全执行").tag(PlanAdherence.exact)
@@ -581,7 +590,8 @@ private func finishExitReview(_ model: AppModel) async {
         secondaryState: model.actualExitState,
         exitStrategy: model.actualExitStrategy,
         plannedExitPrice: price,
-        exitPositionMode: item.plan?.exit?.exitPositionMode ?? .all,
+        exitPositionMode: model.actualExitPositionMode,
+        exitPositionValue: model.actualExitPositionMode == .all ? nil : (try? DecimalValue(parsing: model.actualExitPositionText)),
         adherence: model.adherence,
         deviationReason: model.deviationReason
     )
@@ -597,6 +607,10 @@ struct EmergencyView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("⚠ 紧急解锁")
             Text("这次操作将永久写入 TradeGate Audit Log。")
+            Picker("应用", selection: $model.emergencyApplication) {
+                Text("IBKR").tag(TradingApplication.ibkr)
+                Text("Kraken").tag(TradingApplication.kraken)
+            }
             TextField("标的", text: $model.emergencySymbol)
             Picker("原因", selection: $model.emergencyCategory) {
                 Text("持仓风险").tag(EmergencyReasonCategory.positionRisk)
@@ -609,7 +623,10 @@ struct EmergencyView: View {
             TextField("输入 EMERGENCY UNLOCK", text: $model.emergencyPhrase)
             if model.emergencyArmedAt == nil {
                 Button("开始 \(model.settings.emergencyCountdownSeconds) 秒倒计时") { model.emergencyArmedAt = Date() }
-                    .disabled(!EmergencyGate.canStartCountdown(reason: model.emergencyReason, phrase: model.emergencyPhrase))
+                    .disabled(
+                        model.emergencySymbol.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            || !EmergencyGate.canStartCountdown(reason: model.emergencyReason, phrase: model.emergencyPhrase)
+                    )
             } else if let armedAt = model.emergencyArmedAt,
                       !EmergencyGate.canConfirm(
                           armedAt: armedAt,
@@ -617,12 +634,16 @@ struct EmergencyView: View {
                           countdownSeconds: model.settings.emergencyCountdownSeconds
                       )
             {
-                Text("请等待倒计时")
+                let remaining = max(
+                    0,
+                    model.settings.emergencyCountdownSeconds - Int(Date().timeIntervalSince(armedAt))
+                )
+                Text("倒计时 \(remaining) 秒")
             } else {
                 Button("确认紧急解锁") {
                     Task {
                         let input = EmergencyOverrideInput(
-                            application: model.draft.application,
+                            application: model.emergencyApplication,
                             symbol: Symbol(raw: model.emergencySymbol),
                             reasonCategory: model.emergencyCategory,
                             reasonText: model.emergencyReason,
@@ -815,10 +836,12 @@ struct OnboardingView: View {
     @ObservedObject var model: AppModel
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("检测 daemon：本进程内的 Gate 已启动")
+            Text(model.snapshot.warning == "无法连接 TradeGate daemon。FIDO 状态未知。" ? "daemon：未连接" : "daemon：已连接")
+            Text("钥匙工具：\(model.snapshot.helperStatus ?? "未知")")
             Text(model.snapshot.yubiKeyPresent ? "检测到 YubiKey \(model.snapshot.yubiKeyProduct ?? "")" : "请插入 YubiKey")
             Text("Serial: \(model.snapshot.yubiKeySerial ?? "-")")
             Text("Firmware: \(model.snapshot.yubiKeyFirmware ?? "-")")
+            Text(model.snapshot.yubiKeyPresent ? "FIDO2 / U2F：可以控制" : "FIDO2 / U2F：尚未检测到可管理的钥匙")
             Text("TradeGate 将临时关闭该 YubiKey 的 FIDO 功能，以增加交易账户登录前的操作摩擦。它不会删除 Passkey 或重置 YubiKey。")
             Button("测试 LOCK / UNLOCK / LOCK") {
                 Task {

@@ -12,6 +12,8 @@ public actor YkmanCLIController: YubiKeyControlling {
         self.runner = runner
     }
 
+    public func helperStatus() async -> String { "ykman" }
+
     public func listDevices() async throws -> [YubiKeyDevice] {
         let output = try run(.list)
         return YkmanTextParser.devices(from: output).filter(\.isManageable)

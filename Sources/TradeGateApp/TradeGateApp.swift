@@ -57,6 +57,7 @@ final class AppModel: ObservableObject {
     @Published var fillPositionMode = ExecutionPositionMode.quantity
     @Published var adherence = PlanAdherence.exact
     @Published var deviationReason = ""
+    @Published var emergencyApplication = TradingApplication.ibkr
     @Published var emergencySymbol = ""
     @Published var emergencyReason = ""
     @Published var emergencyPhrase = ""
@@ -85,6 +86,8 @@ final class AppModel: ObservableObject {
     @Published var actualExitState = ExitSecondaryState.oneLegUp
     @Published var actualExitStrategy = ExitStrategy.fullExitOnBreak
     @Published var actualExitPrice = ""
+    @Published var actualExitPositionMode = ExitPositionMode.all
+    @Published var actualExitPositionText = ""
     @Published var draft = TradePlan(application: .ibkr, symbol: Symbol(raw: ""), planType: .entry, entry: EntryPlanFields())
     private let inProcess: (coordinator: GateCoordinator, database: TradeGateDatabase)?
     private var lastState: GateState?
@@ -231,6 +234,8 @@ final class AppModel: ObservableObject {
             actualExitState = exit.secondaryState ?? .oneLegUp
             actualExitStrategy = exit.exitStrategy ?? .fullExitOnBreak
             actualExitPrice = exit.plannedExitPrice?.storage ?? ""
+            actualExitPositionMode = exit.exitPositionMode ?? .all
+            actualExitPositionText = exit.exitPositionValue?.storage ?? ""
         }
         if let price = item.execution?.executionPrice.storage {
             fillPrice = price

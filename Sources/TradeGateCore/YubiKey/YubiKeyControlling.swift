@@ -62,6 +62,8 @@ public actor FailClosedYubiKeyController: YubiKeyControlling {
         self.reason = reason
     }
 
+    public func helperStatus() async -> String { reason }
+
     public func listDevices() async throws -> [YubiKeyDevice] { [] }
 
     public func getState(deviceID _: String) async throws -> YubiKeyState {
@@ -98,6 +100,7 @@ public enum YubiKeyBackend {
 }
 
 public protocol YubiKeyControlling: Sendable {
+    func helperStatus() async -> String
     func listDevices() async throws -> [YubiKeyDevice]
     func getState(deviceID: String) async throws -> YubiKeyState
     func lock(deviceID: String) async throws
@@ -197,6 +200,8 @@ public actor MockYubiKeyController: YubiKeyControlling {
         }
         devices[serialNumber] = device
     }
+
+    public func helperStatus() async -> String { "mock" }
 
     public func listDevices() async throws -> [YubiKeyDevice] {
         devices.values.filter(\.present).map {

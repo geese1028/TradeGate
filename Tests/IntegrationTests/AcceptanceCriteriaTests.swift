@@ -3,6 +3,12 @@ import SQLite3
 import Testing
 @testable import TradeGateCore
 
+@Test func snapshotNamesTheHelper() async throws {
+    let harness = try AcceptanceHarness()
+    let snapshot = await harness.coordinator.snapshot()
+    #expect(snapshot.helperStatus == "mock")
+}
+
 @Test func ac01BootDisablesFIDO() async throws {
     let harness = try AcceptanceHarness()
     await harness.mock.apply(.unlocked)

@@ -14,6 +14,7 @@ public struct GateSnapshot: Equatable, Sendable, Codable {
     public var needsExecutionPrompt: Bool
     public var onboardingComplete: Bool
     public var managedSerial: String?
+    public var helperStatus: String?
 
     public init(
         state: GateState,
@@ -28,7 +29,8 @@ public struct GateSnapshot: Equatable, Sendable, Codable {
         activePlanID: String? = nil,
         needsExecutionPrompt: Bool = false,
         onboardingComplete: Bool = false,
-        managedSerial: String? = nil
+        managedSerial: String? = nil,
+        helperStatus: String? = nil
     ) {
         self.state = state
         self.pendingReviewCount = pendingReviewCount
@@ -43,6 +45,7 @@ public struct GateSnapshot: Equatable, Sendable, Codable {
         self.needsExecutionPrompt = needsExecutionPrompt
         self.onboardingComplete = onboardingComplete
         self.managedSerial = managedSerial
+        self.helperStatus = helperStatus
     }
 }
 
@@ -91,7 +94,8 @@ public actor GateCoordinator {
             activePlanID: activePlanID,
             needsExecutionPrompt: needsExecutionPrompt,
             onboardingComplete: (try? database.flag("onboarding_completed")) == "1",
-            managedSerial: managedSerial
+            managedSerial: managedSerial,
+            helperStatus: await yubiKey.helperStatus()
         )
     }
 
