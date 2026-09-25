@@ -60,6 +60,7 @@ public actor GateCoordinator {
     private var warning: String?
     private var seenDevice = false
     private var lastDevices: [YubiKeyDevice] = []
+    private var lastProbe: Date = .distantPast
 
     public init(database: TradeGateDatabase, yubiKey: any YubiKeyControlling) {
         self.database = database
@@ -75,8 +76,8 @@ public actor GateCoordinator {
         }
     }
 
-    public func snapshot(now: Date = Date()) async -> GateSnapshot {
-        await reconcile(now: now)
+    public func snapshot(now: Date = Date(), probeHardware: Bool = true) async -> GateSnapshot {
+        await reconcile(now: now, probeHardware: probeHardware)
         let pending = (try? database.pendingReviewCount()) ?? 0
         let today = (try? database.todayUnlockCount(now: now)) ?? 0
         let device = lastDevices.first { $0.serialNumber == managedSerial } ?? lastDevices.first
@@ -307,47 +308,51 @@ public actor GateCoordinator {
         try? evaluateAndStore()
     }
 
-    private func reconcile(now: Date) async {
+    private func reconcile(now: Date, probeHardware: Bool = true) async {
         if state == .unlocked, let deadline = unlockDeadline, now >= deadline {
             await lockAfterWindow(now: now)
             return
         }
-        let devices = await (try? yubiKey.listDevices()) ?? []
-        lastDevices = devices
-        if managedSerial == nil {
-            managedSerial = try? database.enabledManagedSerial()
-        }
-        if managedSerial == nil {
-            managedSerial = devices.first(where: \.isManageable)?.serialNumber
-        }
-        let present = devices.contains { $0.serialNumber == managedSerial }
-        if state == .unlocked, seenDevice, !present {
-            warning = "YubiKey 在重新锁定之前被拔出。请重新插入 YubiKey，TradeGate 将立即重新关闭 FIDO。"
-            try? transition(.deviceRemovedWhileUnlocked)
-            _ = try? database.appendAudit(AuditEventDraft(eventType: .deviceRemovedWhileUnlocked))
-            needsExecutionPrompt = false
-        }
-        if state == .lockStateUnknown, present {
-            try? transition(.deviceInserted)
-            _ = try? database.appendAudit(AuditEventDraft(eventType: .deviceInserted, metadata: ["serial": managedSerial ?? ""]))
-            await finishLock(confirmedFailure: false)
-            try? evaluateAndStore()
-        }
-        if present, state == .locked || state.isIdle {
-            if let serial = managedSerial, let device = try? await yubiKey.getState(deviceID: serial), device.fidoAvailable, state != .unlocked, state != .unlocking {
-                try? await yubiKey.lock(deviceID: serial)
+        let interval: TimeInterval = state == .unlocked ? 2 : 8
+        if probeHardware || now.timeIntervalSince(lastProbe) >= interval {
+            lastProbe = now
+            let devices = await (try? yubiKey.listDevices()) ?? []
+            lastDevices = devices
+            if managedSerial == nil {
+                managedSerial = try? database.enabledManagedSerial()
             }
+            if managedSerial == nil {
+                managedSerial = devices.first(where: \.isManageable)?.serialNumber
+            }
+            let present = devices.contains { $0.serialNumber == managedSerial }
+            if state == .unlocked, seenDevice, !present {
+                warning = "YubiKey 在重新锁定之前被拔出。请重新插入 YubiKey，TradeGate 将立即重新关闭 FIDO。"
+                try? transition(.deviceRemovedWhileUnlocked)
+                _ = try? database.appendAudit(AuditEventDraft(eventType: .deviceRemovedWhileUnlocked))
+                needsExecutionPrompt = false
+            }
+            if state == .lockStateUnknown, present {
+                try? transition(.deviceInserted)
+                _ = try? database.appendAudit(AuditEventDraft(eventType: .deviceInserted, metadata: ["serial": managedSerial ?? ""]))
+                await finishLock(confirmedFailure: false)
+                try? evaluateAndStore()
+            }
+            if present, state == .locked || state.isIdle {
+                if let serial = managedSerial, let device = try? await yubiKey.getState(deviceID: serial), device.fidoAvailable, state != .unlocked, state != .unlocking {
+                    try? await yubiKey.lock(deviceID: serial)
+                }
+            }
+            if present, !seenDevice, let serial = managedSerial {
+                _ = try? database.appendAudit(AuditEventDraft(eventType: .deviceInserted, metadata: ["serial": serial]))
+            }
+            if !present, seenDevice {
+                _ = try? database.appendAudit(AuditEventDraft(eventType: .deviceRemoved))
+            }
+            seenDevice = present
         }
         if state.isIdle {
             state = RuleEngine.idleState(facts: (try? currentFacts()) ?? .empty)
         }
-        if present, !seenDevice, let serial = managedSerial {
-            _ = try? database.appendAudit(AuditEventDraft(eventType: .deviceInserted, metadata: ["serial": serial]))
-        }
-        if !present, seenDevice {
-            _ = try? database.appendAudit(AuditEventDraft(eventType: .deviceRemoved))
-        }
-        seenDevice = present
     }
 
     private func finishLock(confirmedFailure: Bool) async {

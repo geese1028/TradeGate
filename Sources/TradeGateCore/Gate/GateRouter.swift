@@ -30,7 +30,8 @@ public enum GateRouter {
         let data = Data(payload.utf8)
         switch action {
         case "snapshot":
-            return try await json(coordinator.snapshot())
+            let probe = !payload.contains("\"probe\":false")
+            return try await json(coordinator.snapshot(probeHardware: probe))
         case "createPlan":
             return try await json(coordinator.createPlan(decode(TradePlan.self, from: data)))
         case "updatePlan":

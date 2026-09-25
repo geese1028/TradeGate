@@ -125,7 +125,7 @@ final class AppModel: ObservableObject {
     }
 
     func refresh() async {
-        let reply = await call("snapshot")
+        let reply = await call("snapshot", #"{"probe":false}"#)
         guard let next = decodeEnvelope(GateSnapshot.self, from: reply) else {
             snapshot = GateSnapshot(
                 state: .lockStateUnknown,

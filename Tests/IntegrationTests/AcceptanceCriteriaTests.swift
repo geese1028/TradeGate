@@ -3,6 +3,13 @@ import SQLite3
 import Testing
 @testable import TradeGateCore
 
+@Test func cachedSnapshotDoesNotRereadTheKey() async throws {
+    let harness = try AcceptanceHarness()
+    _ = await harness.coordinator.snapshot(probeHardware: false)
+    _ = await harness.coordinator.snapshot(probeHardware: false)
+    #expect(await harness.mock.listCount == 1)
+}
+
 @Test func snapshotListsTheKeyOnce() async throws {
     let harness = try AcceptanceHarness()
     _ = await harness.coordinator.snapshot()
