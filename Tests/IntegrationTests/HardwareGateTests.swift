@@ -7,10 +7,14 @@ import Testing
         return
     }
     let path = ProcessInfo.processInfo.environment["TRADEGATE_YKMAN"] ?? "/opt/homebrew/bin/ykman"
-    guard FileManager.default.isExecutableFile(atPath: path) else { return }
+    guard FileManager.default.isExecutableFile(atPath: path) else {
+        throw YubiKeyControlError.untrustedExecutable("ykman is not executable at \(path)")
+    }
     let controller = try YkmanCLIController(executable: path, allowUntrusted: true)
     let devices = try await controller.listDevices()
-    guard let device = devices.first, device.isManageable else { return }
+    guard let device = devices.first, device.isManageable else {
+        throw YubiKeyControlError.absent
+    }
     try await controller.lock(deviceID: device.serialNumber)
     try await controller.unlock(deviceID: device.serialNumber)
     try await controller.lock(deviceID: device.serialNumber)
