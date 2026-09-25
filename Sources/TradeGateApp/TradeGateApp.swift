@@ -171,6 +171,24 @@ final class AppModel: ObservableObject {
         return reply
     }
 
+    func beginNewPlan() {
+        draft = TradePlan(application: .ibkr, symbol: Symbol(raw: ""), planType: .entry, entry: EntryPlanFields())
+        signalAppeared = true
+        stopText = ""
+        positionText = "20"
+        symbolText = ""
+        route = .chooseApp
+    }
+
+    func saveDraft() async -> Bool {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let encoded = (try? encoder.encode(draft)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
+        let action = snapshot.activePlanID == draft.id ? "updatePlan" : "createPlan"
+        let reply = await perform(action, payload: encoded)
+        return reply.contains("\"ok\":true")
+    }
+
     func auditPayload() -> String {
         let filter = AuditFilter(
             day: auditDay.isEmpty ? nil : auditDay,

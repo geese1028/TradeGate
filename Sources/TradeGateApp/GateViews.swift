@@ -17,7 +17,11 @@ struct MenuBarMenu: View {
         }
         Divider()
         Button("开始交易计划") {
-            model.route = model.snapshot.pendingReviewCount > 0 ? .reviewRequired : .chooseApp
+            if model.snapshot.pendingReviewCount > 0 {
+                model.route = .reviewRequired
+            } else {
+                model.beginNewPlan()
+            }
             openWindow(id: "gate")
         }
         .disabled(model.snapshot.pendingReviewCount > 0 || model.snapshot.state == .unlocked)
@@ -92,7 +96,7 @@ struct HomeView: View {
             if let warning = model.snapshot.warning {
                 Text(warning).foregroundStyle(.orange)
             }
-            Button("开始一次交易计划") { model.route = .chooseApp }
+            Button("开始一次交易计划") { model.beginNewPlan() }
                 .disabled(model.snapshot.pendingReviewCount > 0)
             HStack {
                 Button("Journal") { model.route = .journal }
@@ -259,8 +263,7 @@ struct EntryFormView: View {
             model.draft.entry?.positionMode = nil
             model.draft.entry?.positionValue = nil
         }
-        let payload = (try? json(model.draft)) ?? ""
-        await model.perform("createPlan", payload: payload)
+        guard await model.saveDraft() else { return }
         model.route = model.signalAppeared ? .confirm : .signalPending
     }
 }
@@ -292,7 +295,7 @@ struct ExitFormView: View {
                 model.draft.exit?.customExitStrategy = model.exitCustom
                 model.draft.exit?.exitPositionMode = .all
                 Task {
-                    await model.perform("createPlan", payload: (try? json(model.draft)) ?? "")
+                    guard await model.saveDraft() else { return }
                     model.route = .confirm
                 }
             }
