@@ -406,9 +406,11 @@ struct ExecutionPromptView: View {
             if !model.traded {
                 Button("没有交易") {
                     Task {
-                        let id = model.snapshot.activePlanID ?? ""
-                        await model.perform("noTrade", payload: #"{"id":"\#(id)","disposition":"NO_EXECUTION"}"#)
-                        model.route = .home
+                        let id = model.snapshot.activePlanID ?? model.draft.id
+                        let reply = await model.perform("noTrade", payload: #"{"id":"\#(id)","disposition":"NO_EXECUTION"}"#)
+                        if reply.contains("\"ok\":true") {
+                            model.route = .home
+                        }
                     }
                 }
                 Button("已成交") { model.beginExecutionReport() }
@@ -431,8 +433,10 @@ struct ExecutionPromptView: View {
                             positionMode: model.fillPositionMode,
                             positionValue: model.fillPositionMode == .all ? nil : (try? DecimalValue(parsing: model.fillSize))
                         )
-                        await model.perform("execution", payload: (try? json(input)) ?? "")
-                        model.route = .reviewRequired
+                        let reply = await model.perform("execution", payload: (try? json(input)) ?? "")
+                        if reply.contains("\"ok\":true") {
+                            model.route = .reviewRequired
+                        }
                     }
                 }
             }
